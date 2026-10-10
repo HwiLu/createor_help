@@ -16,11 +16,13 @@ from app.db.session import get_db
 from app.models.comment import Comment
 from app.models.creator_account import CreatorAccount
 from app.models.enums import (
+    CREATOR_CATEGORY_LABELS,
     MUTUAL_TYPE_LABELS,
     PLATFORM_LABELS,
     REQUEST_STATUS_LABELS,
     CommentStatus,
     CreatorAccountStatus,
+    CreatorCategory,
     MutualRequestStatus,
     MutualType,
     Platform,
@@ -31,6 +33,7 @@ from app.models.enums import (
 from app.models.mutual_request import MutualRequest
 from app.models.post import Post
 from app.models.report import Report
+from app.models.top_creator import TopCreator
 from app.models.user import User
 from app.services.post_service import applicant_count, get_post, list_posts
 from app.services.trust_service import compute_tags, compute_trust_stats
@@ -45,11 +48,13 @@ templates.env.globals.update(
         "PLATFORM_LABELS": {k.value: v for k, v in PLATFORM_LABELS.items()},
         "MUTUAL_TYPE_LABELS": {k.value: v for k, v in MUTUAL_TYPE_LABELS.items()},
         "REQUEST_STATUS_LABELS": {k.value: v for k, v in REQUEST_STATUS_LABELS.items()},
+        "CREATOR_CATEGORY_LABELS": {k.value: v for k, v in CREATOR_CATEGORY_LABELS.items()},
         "Platform": Platform,
         "MutualType": MutualType,
         "PostStatus": PostStatus,
         "MutualRequestStatus": MutualRequestStatus,
         "UserRole": UserRole,
+        "CreatorCategory": CreatorCategory,
     }
 )
 
@@ -92,6 +97,42 @@ def home(request: Request, db: Session = Depends(get_db), platform: Optional[str
             platform_filter=platform,
             keyword=keyword or "",
             my_accounts=accounts,
+        ),
+    )
+
+
+@web_router.get("/creators")
+def creators_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    platform: Optional[str] = None,
+    category: Optional[str] = None,
+):
+    """优秀博主展示墙：顶部按平台筛选，左侧按主题筛选。"""
+    query = db.query(TopCreator).filter(
+        TopCreator.status == "ACTIVE",
+        TopCreator.is_featured == True,  # noqa: E712
+    )
+    if platform:
+        query = query.filter(TopCreator.platform == platform)
+    if category:
+        query = query.filter(TopCreator.category == category)
+    creators = query.order_by(TopCreator.rank.asc(), TopCreator.id.asc()).all()
+
+    grouped: dict[str, list[TopCreator]] = {}
+    for c in creators:
+        grouped.setdefault(c.category, []).append(c)
+
+    return templates.TemplateResponse(
+        request,
+        "creators.html",
+        _ctx(
+            request,
+            db,
+            creators=creators,
+            grouped=grouped,
+            platform_filter=platform,
+            category_filter=category,
         ),
     )
 

@@ -9,11 +9,13 @@ from sqlalchemy.orm import Session
 
 from app.models import utcnow
 from app.models.creator_account import CreatorAccount
-from app.models.enums import CreatorAccountStatus, MutualType, PostStatus
+from app.models.enums import CreatorAccountStatus, MutualType, NotificationType, PostStatus
 from app.models.mutual_request import MutualRequest
 from app.models.post import Post
 from app.models.user import User
 from app.schemas import PostCreate, PostUpdate
+from app.services.audit_service import write_audit
+from app.services.notification_service import notify
 
 
 def create_post(db: Session, user: User, data: PostCreate) -> Post:
@@ -24,6 +26,23 @@ def create_post(db: Session, user: User, data: PostCreate) -> Post:
     # 不要求回关的帖子不得宣传为互关
     if data.mutual_type == MutualType.FOLLOW_FOR_FOLLOW and not data.requires_follow_back:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="互关类型帖子必须要求回关")
+
+    # 重复检测：同一用户 + 同一平台 + 标题或内容相同，拒绝重复发布
+    duplicate = (
+        db.query(Post)
+        .filter(
+            Post.user_id == user.id,
+            Post.target_platform == data.target_platform.value,
+            Post.status != PostStatus.DELETED.value,
+            or_(Post.title == data.title.strip(), Post.content == data.content.strip()),
+        )
+        .first()
+    )
+    if duplicate is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="已存在标题或内容相同的互助帖子，请勿重复发布",
+        )
 
     post = Post(
         user_id=user.id,
@@ -87,6 +106,28 @@ def delete_post(db: Session, user: User, post_id: int) -> None:
     post.status = PostStatus.DELETED.value
     post.updated_at = utcnow()
     db.commit()
+
+
+def admin_delete_post(db: Session, admin: User, post_id: int, reason: str) -> Post:
+    """管理员删除违规帖子：软删除 + 审计日志 + 通知作者。"""
+    post = db.get(Post, post_id)
+    if post is None or post.status == PostStatus.DELETED.value:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="帖子不存在或已删除")
+    post.status = PostStatus.DELETED.value
+    post.updated_at = utcnow()
+    write_audit(db, admin.id, "ADMIN_DELETE_POST", "POST", post.id, reason=reason)
+    notify(
+        db,
+        post.user_id,
+        NotificationType.ADMIN,
+        "帖子已被删除",
+        f"你的帖子「{post.title}」因违规被删除。原因：{reason}",
+        "POST",
+        post.id,
+    )
+    db.commit()
+    db.refresh(post)
+    return post
 
 
 def list_posts(

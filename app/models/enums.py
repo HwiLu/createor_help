@@ -149,3 +149,26 @@ class NotificationType(StrEnum):
     COMPLETED = "COMPLETED"
     DISPUTE_RESULT = "DISPUTE_RESULT"
     ADMIN = "ADMIN"
+
+
+class CreatorCategory(StrEnum):
+    """优秀博主展示的主题板块（固定顺序）。"""
+
+    BEAUTY = "BEAUTY"
+    FITNESS = "FITNESS"
+    LIFESTYLE = "LIFESTYLE"
+    FOOTBALL = "FOOTBALL"
+    WORK = "WORK"
+    TRAVEL = "TRAVEL"
+    GAMING = "GAMING"
+
+
+CREATOR_CATEGORY_LABELS = {
+    CreatorCategory.BEAUTY: "美妆",
+    CreatorCategory.FITNESS: "健身",
+    CreatorCategory.LIFESTYLE: "生活",
+    CreatorCategory.FOOTBALL: "足球",
+    CreatorCategory.WORK: "工作",
+    CreatorCategory.TRAVEL: "旅游",
+    CreatorCategory.GAMING: "游戏",
+}

@@ -58,6 +58,31 @@
     </div></div>
   </div>
 </div>
+
+<div class="row g-4 mt-4">
+  <div class="col-12">
+    <div class="card"><div class="card-body p-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="mb-0" style="font-weight:700">帖子管理</h6>
+        <button class="btn btn-sm btn-outline-primary" onclick="loadPosts()">刷新</button>
+      </div>
+      <div class="table-responsive"><table class="table table-sm align-middle">
+        <thead><tr>
+          <th style="color:var(--text-secondary);font-weight:500">ID</th>
+          <th style="color:var(--text-secondary);font-weight:500">标题 / 内容</th>
+          <th style="color:var(--text-secondary);font-weight:500">作者</th>
+          <th style="color:var(--text-secondary);font-weight:500">平台</th>
+          <th style="color:var(--text-secondary);font-weight:500">状态</th>
+          <th style="color:var(--text-secondary);font-weight:500">重复</th>
+          <th style="color:var(--text-secondary);font-weight:500">操作</th>
+        </tr></thead>
+        <tbody id="posts-tbody">
+          <tr><td colspan="7" class="text-center text-muted small">加载中…</td></tr>
+        </tbody>
+      </table></div>
+    </div></div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -75,5 +100,52 @@ async function restrict(id, action) {
     body: JSON.stringify({ action, reason }) });
   if (res.ok) location.reload(); else alert((await res.json()).detail);
 }
+
+const PLATFORM_CN = { DOUYIN:'抖音', XIAOHONGSHU:'小红书', BILIBILI:'B站', WECHAT_OFFICIAL_ACCOUNT:'公众号', WECHAT_CHANNEL:'视频号', OTHER:'其他' };
+const POST_STATUS_CN = { PUBLISHED:'已发布', CLOSED:'已关闭', EXPIRED:'已过期', DELETED:'已删除' };
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function loadPosts() {
+  const tbody = document.getElementById('posts-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted small">加载中…</td></tr>';
+  const res = await fetch('/api/v1/admin/posts?page=1&page_size=100');
+  const data = await res.json();
+  if (!res.ok || !data.items) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted small">' + escapeHtml((data && data.detail) || '加载失败') + '</td></tr>';
+    return;
+  }
+  if (data.items.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted small">暂无帖子</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.items.map(p => {
+    const dupBadge = p.duplicate_count > 1
+      ? '<span class="badge badge-soft-warning" title="同一用户同一平台标题/内容相同">重复×' + p.duplicate_count + '</span>'
+      : '<span class="badge badge-soft-neutral">唯一</span>';
+    const statusBadge = '<span class="badge badge-soft-primary">' + escapeHtml(POST_STATUS_CN[p.status] || p.status) + '</span>';
+    return '<tr>' +
+      '<td>' + p.id + '</td>' +
+      '<td><div class="fw-semibold text-truncate" style="max-width:220px">' + escapeHtml(p.title) + '</div>' +
+          '<div class="small text-truncate" style="color:var(--text-secondary);max-width:220px">' + escapeHtml(p.content) + '</div></td>' +
+      '<td>' + escapeHtml(p.author_nickname || '') + '</td>' +
+      '<td>' + escapeHtml(PLATFORM_CN[p.target_platform] || p.target_platform) + '</td>' +
+      '<td>' + statusBadge + '</td>' +
+      '<td>' + dupBadge + '</td>' +
+      '<td><button class="btn btn-sm btn-outline-danger" onclick="deletePost(' + p.id + ')">删除</button></td>' +
+      '</tr>';
+  }).join('');
+}
+
+async function deletePost(id) {
+  const reason = prompt('请输入删除原因（将通知作者并记录审计日志）：');
+  if (reason === null || reason.trim() === '') return;
+  const res = await fetch('/api/v1/admin/posts/' + id + '?reason=' + encodeURIComponent(reason), { method: 'DELETE' });
+  if (res.ok) loadPosts(); else alert((await res.json()).detail || '删除失败');
+}
+
+loadPosts();
 </script>
 {% endblock %}
