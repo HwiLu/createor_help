@@ -1,0 +1,23 @@
+[
+  {
+    "platform": "小红书",
+    "category": "美妆",
+    "username": "程十安an",
+    "nickname": "程十安",
+    "follower_count": 12000000
+  },
+  {
+    "platform": "抖音",
+    "category": "生活",
+    "username": "疯狂小杨哥",
+    "nickname": "小杨哥",
+    "follower_count": "1亿"
+  },
+  {
+    "platform": "B站",
+    "category": "游戏",
+    "username": "老番茄",
+    "nickname": "老番茄",
+    "follower_count": 20000000
+  }
+]
