@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-4">
+  <h1 class="section-title mb-1">管理后台</h1>
+  <p class="section-sub mb-0">平台运营数据与内容治理。</p>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3"><div class="stat-box"><div class="stat-num">{{ dashboard.users }}</div><div class="stat-label">用户</div></div></div>
+  <div class="col-6 col-md-3"><div class="stat-box"><div class="stat-num">{{ dashboard.posts }}</div><div class="stat-label">帖子</div></div></div>
+  <div class="col-6 col-md-3"><div class="stat-box"><div class="stat-num">{{ dashboard.active_requests }}</div><div class="stat-label">互助申请</div></div></div>
+  <div class="col-6 col-md-3"><div class="stat-box"><div class="stat-num">{{ dashboard.pending_reports }}</div><div class="stat-label">待处理举报</div></div></div>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-6">
+    <div class="card"><div class="card-body p-4">
+      <h6 class="mb-3" style="font-weight:700">举报处理</h6>
+      {% for r in reports %}
+      <div class="py-3 {% if not loop.last %}border-bottom{% endif %}" style="border-color:var(--border)!important">
+        <p class="small mb-1"><strong>{{ r.target_type }} #{{ r.target_id }}</strong> · 原因：{{ r.reason }}
+          <span class="badge {% if r.status=='PENDING' %}badge-soft-warning{% else %}badge-soft-neutral{% endif %}">{{ r.status }}</span></p>
+        {% if r.description %}<p class="small mb-1" style="color:var(--text-secondary)">{{ r.description }}</p>{% endif %}
+        {% if r.status == 'PENDING' %}
+        <div class="d-flex gap-1">
+          <input type="text" id="res-{{ r.id }}" class="form-control form-control-sm" placeholder="处理结果说明">
+          <button class="btn btn-sm btn-outline-success" onclick="resolveReport({{ r.id }}, 'RESOLVED')">通过</button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="resolveReport({{ r.id }}, 'DISMISSED')">驳回</button>
+        </div>
+        {% endif %}
+      </div>
+      {% else %}<p class="text-muted small mb-0">暂无举报</p>{% endfor %}
+    </div></div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card"><div class="card-body p-4">
+      <h6 class="mb-3" style="font-weight:700">用户管理</h6>
+      <div class="table-responsive"><table class="table table-sm align-middle">
+        <thead><tr><th style="color:var(--text-secondary);font-weight:500">昵称</th><th style="color:var(--text-secondary);font-weight:500">角色</th><th style="color:var(--text-secondary);font-weight:500">状态</th><th style="color:var(--text-secondary);font-weight:500">操作</th></tr></thead>
+        <tbody>
+        {% for u in users %}
+        <tr>
+          <td class="fw-semibold">{{ u.nickname }}</td>
+          <td><span class="badge {% if u.role=='ADMIN' %}badge-soft-danger{% else %}badge-soft-primary{% endif %}">{{ u.role }}</span></td>
+          <td><span class="badge {% if u.status=='BANNED' %}badge-soft-danger{% elif u.status=='RESTRICTED' %}badge-soft-warning{% else %}badge-soft-success{% endif %}">{{ u.status }}</span></td>
+          <td>
+            <div class="d-flex gap-1">
+              <button class="btn btn-sm btn-outline-warning" onclick="restrict({{ u.id }}, 'RESTRICT')">限制</button>
+              <button class="btn btn-sm btn-outline-danger" onclick="restrict({{ u.id }}, 'BAN')">封禁</button>
+              <button class="btn btn-sm btn-outline-success" onclick="restrict({{ u.id }}, 'UNBAN')">解封</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+    </div></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function resolveReport(id, status) {
+  const resolution = document.getElementById('res-' + id).value || '处理';
+  const res = await fetch('/api/v1/admin/reports/' + id + '/resolve', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ resolution, status }) });
+  if (res.ok) location.reload(); else alert((await res.json()).detail);
+}
+async function restrict(id, action) {
+  const reason = prompt('请输入操作原因：');
+  if (reason === null) return;
+  const res = await fetch('/api/v1/admin/users/' + id + '/restrict', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ action, reason }) });
+  if (res.ok) location.reload(); else alert((await res.json()).detail);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-12 col-lg-4">
+    <div class="card">
+      <div class="card-body p-4 text-center">
+        <div class="profile-avatar mx-auto mb-3">{{ current_user.nickname[:1] }}</div>
+        <h5 class="mb-1" style="font-weight:700">{{ current_user.nickname }}</h5>
+        <div class="small text-muted mb-3">OpenID：{{ current_user.openid }}</div>
+        <span class="badge {% if current_user.role == 'ADMIN' %}badge-soft-danger{% else %}badge-soft-primary{% endif %}">{{ '管理员' if current_user.role == 'ADMIN' else '创作者' }}</span>
+        {% if current_user.status == 'BANNED' %}<span class="badge badge-soft-danger">已封禁</span>{% endif %}
+        <div class="row g-2 mt-3 text-center">
+          <div class="col-6"><div class="stat-box"><div class="stat-num">{{ accounts|length }}</div><div class="stat-label">创作者账号</div></div></div>
+          <div class="col-6"><div class="stat-box"><div class="stat-num">{{ stats.completed_mutuals }}</div><div class="stat-label">完成互助</div></div></div>
+        </div>
+        <a class="btn btn-outline-secondary btn-sm w-100 mt-3" href="#" onclick="logout(event)">退出登录</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-8">
+    <div class="card mb-4">
+      <div class="card-body p-4">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h6 class="mb-0" style="font-weight:700">我的创作者账号</h6>
+          <button class="btn btn-primary btn-sm btn-pill" data-bs-toggle="collapse" data-bs-target="#add-account">+ 添加账号</button>
+        </div>
+        <div class="collapse mb-3" id="add-account">
+          <form action="/api/v1/accounts" method="post" class="p-3 rounded-3" style="background:var(--surface-2)">
+            <div class="row g-2">
+              <div class="col-md-4">
+                <label class="form-label">平台</label>
+                <select name="platform" class="form-select" required>
+                  {% for p in Platform %}<option value="{{ p.value }}">{{ PLATFORM_LABELS[p.value] }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">账号名</label>
+                <input name="account_name" class="form-control" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">主页链接</label>
+                <input name="profile_url" class="form-control">
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm mt-2" type="submit">保存账号</button>
+          </form>
+        </div>
+        <div class="list-group list-group-flush">
+          {% for a in accounts %}
+          <div class="d-flex align-items-center justify-content-between py-2">
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge badge-soft-info">{{ PLATFORM_LABELS.get(a.platform, a.platform) }}</span>
+              <strong>{{ a.account_name }}</strong>
+              {% if a.profile_url %}<a href="{{ a.profile_url }}" target="_blank" rel="noopener" class="small">主页 ↗</a>{% endif %}
+            </div>
+            <span class="badge badge-soft-success">已验证</span>
+          </div>
+          {% else %}
+          <p class="text-muted small mb-0">还没有创作者账号，添加后可发布互助帖子。</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body p-4">
+        <h6 class="mb-3" style="font-weight:700">我的互助帖子</h6>
+        <div class="row g-3">
+          {% for p in my_posts %}
+          <div class="col-md-6">
+            <a href="/posts/{{ p.id }}" class="text-decoration-none">
+              <div class="card card-hover p-3 h-100">
+                <div class="d-flex gap-2 mb-2">
+                  <span class="badge badge-soft-primary">{{ PLATFORM_LABELS.get(p.target_platform, p.target_platform) }}</span>
+                  {% if p.status == 'PUBLISHED' %}<span class="badge badge-soft-success">进行中</span>{% else %}<span class="badge badge-soft-neutral">{{ p.status }}</span>{% endif %}
+                </div>
+                <div class="small fw-semibold text-dark">{{ p.title }}</div>
+              </div>
+            </a>
+          </div>
+          {% else %}<p class="text-muted small mb-0">还没有发布过帖子。</p>{% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8">
+    <div class="mb-4">
+      <h1 class="section-title mb-1">发布互助帖子</h1>
+      <p class="section-sub mb-0">描述你的互助需求，等待创作者来申请。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-body p-4">
+        <form action="/api/v1/posts" method="post">
+          <div class="mb-3">
+            <label class="form-label">帖子标题</label>
+            <input name="title" class="form-control" maxlength="100" required placeholder="如：小红书互关，求同频创作者">
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <label class="form-label">目标平台</label>
+              <select name="target_platform" class="form-select" required>
+                {% for p in Platform %}<option value="{{ p.value }}">{{ PLATFORM_LABELS[p.value] }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">互助类型</label>
+              <select name="mutual_type" class="form-select" required>
+                {% for t in MutualType %}<option value="{{ t.value }}">{{ MUTUAL_TYPE_LABELS[t.value] }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">最多申请人数</label>
+              <input type="number" name="max_applicants" class="form-control" value="10" min="1" max="100">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">你要推广的目标账号（申请者需关注此账号）</label>
+            <input name="target_account_name" class="form-control" required placeholder="输入你的账号昵称">
+            <input name="target_account_url" class="form-control mt-2" placeholder="账号主页链接（可选）">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">帖子内容</label>
+            <textarea name="content" class="form-control" rows="5" maxlength="2000" required placeholder="说明互助规则、回关要求、注意事项等"></textarea>
+          </div>
+          <div class="form-check mb-4">
+            <input class="form-check-input" type="checkbox" name="requires_follow_back" value="true" checked id="rfb">
+            <label class="form-check-label" for="rfb">要求申请者关注后我回关（回关互助）</label>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary btn-lg px-4" type="submit">发布</button>
+            <a href="/" class="btn btn-outline-secondary">取消</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

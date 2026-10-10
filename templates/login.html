@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-6 col-lg-5">
+    <div class="auth-card">
+      <div class="card-body">
+        <div class="text-center mb-4">
+          <span class="brand-mark mx-auto mb-3" style="width:48px;height:48px;border-radius:14px">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </span>
+          <h3 class="mb-1" style="font-weight:700">登录 CreatorHub</h3>
+          <p class="text-muted small mb-0">加入创作者互助社区</p>
+        </div>
+
+        {% if settings.wechat_configured %}
+        <button id="wechat-login-btn" class="btn btn-success w-100 mb-3" style="padding:12px">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="vertical-align:-3px;margin-right:6px"><path d="M8.5 4C5 4 2 6.5 2 9.5c0 1.8 1 3.3 2.5 4.3L4 16l2.3-1.2c.7.2 1.4.3 2.2.3h.4a5.5 5.5 0 0 1-.1-1.1c0-3 2.9-5.5 6.4-5.5h.7C14.8 6 11.9 4 8.5 4z"/><path d="M22 14.5c0-2.5-2.5-4.5-5.5-4.5S11 12 11 14.5s2.5 4.5 5.5 4.5c.7 0 1.3-.1 1.9-.3L20 20l-.5-1.7c1.6-.9 2.5-2.2 2.5-3.8z"/></svg>
+          微信扫码登录
+        </button>
+        <div id="qrcode-box" class="text-center d-none mb-3">
+          <div id="qrcode" class="d-inline-block p-3 bg-white rounded shadow-sm mb-2"></div>
+          <p class="small text-muted mb-0">请使用微信扫描二维码</p>
+        </div>
+        {% else %}
+        <div class="alert alert-warning small">微信登录尚未配置。开发环境可开启 Mock 登录进行本地测试。</div>
+        {% endif %}
+
+        {% if settings.mock_login_available %}
+        <div class="position-relative text-center my-4">
+          <hr>
+          <span class="position-absolute top-50 start-50 translate-middle bg-white px-3 small text-muted">开发测试</span>
+        </div>
+        <p class="small text-muted mb-2 text-center">Mock 登录（仅限本地测试）</p>
+        <form action="/api/v1/auth/mock-login" method="post" class="mb-2">
+          <div class="input-group">
+            <input type="text" name="nickname" class="form-control" placeholder="输入昵称（可选）">
+            <input type="hidden" name="openid" value="mock_user_1">
+            <button class="btn btn-outline-primary" type="submit">Mock 用户 A</button>
+          </div>
+        </form>
+        <form action="/api/v1/auth/mock-login" method="post">
+          <div class="input-group">
+            <input type="text" name="nickname" class="form-control" placeholder="输入昵称（可选）">
+            <input type="hidden" name="openid" value="mock_user_2">
+            <button class="btn btn-outline-secondary" type="submit">Mock 用户 B</button>
+          </div>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if settings.wechat_configured %}
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script>
+document.getElementById('wechat-login-btn').addEventListener('click', async () => {
+  const res = await fetch('/api/v1/auth/wechat/start');
+  const data = await res.json();
+  if (data.authorize_url) {
+    document.getElementById('qrcode-box').classList.remove('d-none');
+    document.getElementById('qrcode').innerHTML = '';
+    new QRCode(document.getElementById('qrcode'), { text: data.authorize_url, width: 200, height: 200 });
+  } else {
+    alert(data.detail || '发起登录失败');
+  }
+});
+</script>
+{% endif %}
+{% endblock %}

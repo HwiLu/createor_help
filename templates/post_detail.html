@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-9">
+    <div class="card mb-3">
+      <div class="card-body p-4">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+          <span class="badge badge-soft-primary">{{ PLATFORM_LABELS.get(post.target_platform, post.target_platform) }}</span>
+          <span class="badge badge-soft-neutral">{{ MUTUAL_TYPE_LABELS.get(post.mutual_type, post.mutual_type) }}</span>
+          {% if post.status == 'PUBLISHED' %}<span class="badge badge-soft-success">进行中</span>
+          {% elif post.status == 'CLOSED' %}<span class="badge badge-soft-neutral">已关闭</span>
+          {% elif post.status == 'EXPIRED' %}<span class="badge badge-soft-warning">已过期</span>{% endif %}
+        </div>
+        <h2 class="mb-2" style="font-weight:700;letter-spacing:-.02em">{{ post.title }}</h2>
+        <div class="d-flex align-items-center gap-2 text-muted small mb-3">
+          <span class="mini-avatar">{{ post.author.nickname[:1] }}</span>
+          <span>{{ post.author.nickname }}</span>
+          <span>·</span>
+          <span>{{ post.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+        </div>
+        <p class="mb-4" style="font-size:15px;white-space:pre-wrap">{{ post.content }}</p>
+
+        <div class="p-3 rounded-3 mb-4" style="background:var(--surface-2);border:1px solid var(--border)">
+          <div class="small text-muted mb-2 fw-medium">目标账号</div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge badge-soft-info">{{ PLATFORM_LABELS.get(post.target_account.platform, post.target_account.platform) }}</span>
+            <strong>{{ post.target_account.account_name }}</strong>
+            {% if post.target_account.profile_url %}<a href="{{ post.target_account.profile_url }}" target="_blank" rel="noopener" class="small">查看主页 ↗</a>{% endif %}
+          </div>
+        </div>
+
+        <div class="p-3 rounded-3 mb-4" style="background:var(--primary-soft);border:1px solid #e0e7ff">
+          <div class="small mb-1 fw-medium" style="color:var(--primary)">互助规则</div>
+          <p class="small mb-0" style="color:#4338ca">
+            申请者请先关注发帖人指定账号，再提交关注证明。
+            {% if post.requires_follow_back %}发帖人核验通过后完成回关。{% else %}本帖不要求回关。{% endif %}
+            已申请 <strong>{{ applicants }}</strong>/{{ post.max_applicants }}。
+          </p>
+        </div>
+
+        <div class="d-flex gap-2 flex-wrap">
+          {% if current_user and current_user.id != post.user_id %}
+            {% if my_application %}
+              <a href="/mutual" class="btn btn-outline-secondary">查看我的申请（{{ REQUEST_STATUS_LABELS.get(my_application.status, my_application.status) }}）</a>
+            {% elif post.status == 'PUBLISHED' %}
+              <a href="/posts/{{ post.id }}/apply" class="btn btn-primary btn-lg">申请互助</a>
+            {% endif %}
+          {% elif not current_user %}
+            <a href="/login?next=/posts/{{ post.id }}" class="btn btn-primary btn-lg">登录后申请互助</a>
+          {% endif %}
+          {% if current_user and current_user.id == post.user_id %}
+            <button class="btn btn-outline-warning" onclick="closePost({{ post.id }})">关闭帖子</button>
+          {% endif %}
+          <button class="btn btn-outline-danger btn-sm" onclick="reportPost({{ post.id }})">举报</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body p-4">
+        <h6 class="mb-3" style="font-weight:700">评论 <span class="text-muted fw-normal small">({{ comments|length }})</span></h6>
+        <div id="comments" class="mb-3">
+          {% for c in comments %}
+          <div class="d-flex gap-2 py-3 {% if not loop.last %}border-bottom{% endif %}" style="border-color:var(--border)!important">
+            <span class="mini-avatar" style="width:32px;height:32px;font-size:13px">{{ c.author.nickname[:1] }}</span>
+            <div class="flex-grow-1">
+              <div class="d-flex align-items-center gap-2">
+                <strong class="small">{{ c.author.nickname }}</strong>
+                <span class="small text-muted">{{ c.created_at.strftime('%m-%d %H:%M') }}</span>
+              </div>
+              <p class="mb-0 small" style="color:var(--text-secondary)">{{ c.content }}</p>
+            </div>
+          </div>
+          {% else %}<p class="text-muted small mb-0">暂无评论，来发表第一条评论吧。</p>{% endfor %}
+        </div>
+        {% if current_user %}
+        <form id="comment-form" class="d-flex gap-2">
+          <input type="text" name="content" class="form-control" placeholder="发表评论…" maxlength="500" required>
+          <button class="btn btn-primary" type="submit">发送</button>
+        </form>
+        {% else %}
+        <p class="small text-muted mb-0"><a href="/login">登录</a> 后可评论。</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function closePost(id) {
+  if (!confirm('确定关闭该帖子？')) return;
+  const res = await fetch('/api/v1/posts/' + id + '/close', { method: 'POST' });
+  if (res.ok) location.reload(); else alert('操作失败');
+}
+async function reportPost(id) {
+  if (!confirm('确定举报该帖子？')) return;
+  const res = await fetch('/api/v1/reports', { method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ target_type: 'POST', target_id: id, reason: '违规内容', description: '' }) });
+  if (res.ok) alert('举报已提交'); else alert('举报失败，请先登录');
+}
+{% if current_user %}
+document.getElementById('comment-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const content = new FormData(e.target).get('content');
+  const res = await fetch('/api/v1/posts/{{ post.id }}/comments', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ content }) });
+  if (res.ok) location.reload(); else alert('评论失败');
+});
+{% endif %}
+</script>
+{% endblock %}

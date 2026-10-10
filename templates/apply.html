@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8">
+    <div class="mb-4">
+      <h1 class="section-title mb-1">申请互助</h1>
+      <p class="section-sub mb-0">申请「{{ post.title }}」</p>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-body p-4">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+          <span class="badge badge-soft-primary">{{ PLATFORM_LABELS.get(post.target_platform, post.target_platform) }}</span>
+          <span class="badge badge-soft-neutral">{{ MUTUAL_TYPE_LABELS.get(post.mutual_type, post.mutual_type) }}</span>
+        </div>
+        <p class="mb-3">{{ post.content }}</p>
+        <div class="p-3 rounded-3 mb-0" style="background:var(--primary-soft);border:1px solid #e0e7ff">
+          <div class="small fw-medium mb-1" style="color:var(--primary)">你需要关注的目标账号</div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge badge-soft-info">{{ PLATFORM_LABELS.get(post.target_account.platform, post.target_account.platform) }}</span>
+            <strong>{{ post.target_account.account_name }}</strong>
+            {% if post.target_account.profile_url %}<a href="{{ post.target_account.profile_url }}" target="_blank" rel="noopener" class="small">去关注 ↗</a>{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body p-4">
+        <form action="/api/v1/posts/{{ post.id }}/apply" method="post">
+          <div class="mb-3">
+            <label class="form-label">使用哪个创作者账号去关注</label>
+            <select name="applicant_account_id" class="form-select" required>
+              {% for a in accounts %}
+              <option value="{{ a.id }}">{{ PLATFORM_LABELS.get(a.platform, a.platform) }} · {{ a.account_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-4">
+            <label class="form-label">申请说明（可选）</label>
+            <textarea name="message" class="form-control" rows="3" maxlength="500" placeholder="补充说明你的账号情况"></textarea>
+          </div>
+          <div class="alert alert-info small">
+            请先到对方主页完成关注，再提交申请。后续需上传关注截图作为证据。
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary btn-lg px-4" type="submit">提交申请</button>
+            <a href="/posts/{{ post.id }}" class="btn btn-outline-secondary">返回</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
