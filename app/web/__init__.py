@@ -33,7 +33,7 @@ from app.models.enums import (
 from app.models.mutual_request import MutualRequest
 from app.models.post import Post
 from app.models.report import Report
-from app.models.top_creator import TopCreator
+from app.models.top_creator import TopCreator, follower_tier
 from app.models.user import User
 from app.services.post_service import applicant_count, get_post, list_posts
 from app.services.trust_service import compute_tags, compute_trust_stats
@@ -55,6 +55,7 @@ templates.env.globals.update(
         "MutualRequestStatus": MutualRequestStatus,
         "UserRole": UserRole,
         "CreatorCategory": CreatorCategory,
+        "follower_tier": follower_tier,
     }
 )
 

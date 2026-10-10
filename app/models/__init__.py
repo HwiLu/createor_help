@@ -18,4 +18,4 @@ from app.models.evidence import EvidenceFile  # noqa: E402,F401
 from app.models.notification import Notification  # noqa: E402,F401
 from app.models.report import Report  # noqa: E402,F401
 from app.models.audit_log import AuditLog  # noqa: E402,F401
-from app.models.top_creator import TopCreator  # noqa: E402,F401
+from app.models.top_creator import TopCreator, follower_tier  # noqa: E402,F401

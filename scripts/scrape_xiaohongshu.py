@@ -30,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.db.base import Base  # noqa: E402
 from app.db.session import SessionLocal, engine  # noqa: E402
-from app.models import TopCreator  # noqa: E402
+from app.models import TopCreator, follower_tier  # noqa: E402
 from app.models.enums import CreatorCategory, Platform  # noqa: E402
 
 SEARCH_URL = "https://www.xiaohongshu.com/search_result"
@@ -119,7 +119,7 @@ def import_from_json(path: str) -> None:
                     f"https://www.xiaohongshu.com/search_result?keyword={row['username']}"
                 ),
                 follower_count=int(row.get("follower_count", 0)),
-                follower_display=row.get("follower_display"),
+                follower_display=row.get("follower_display") or follower_tier(int(row.get("follower_count", 0))),
                 rank=int(row.get("rank", 0)),
                 is_featured=True,
                 status="ACTIVE",

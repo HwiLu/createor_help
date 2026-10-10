@@ -7,7 +7,7 @@
       <h1 class="hero-title">优秀博主</h1>
       <p class="hero-sub mb-0">发现各领域值得关注的优质创作者，点击卡片直达主页，或复制账号名前往平台搜索核实。</p>
     </div>
-    <span class="badge badge-soft-warning" style="font-size:13px">示例数据 · 粉丝量为估算值</span>
+    <span class="badge badge-soft-warning" style="font-size:13px">示例数据 · 粉丝量级为估算区间</span>
   </div>
 </section>
 
@@ -82,7 +82,7 @@
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                         </button>
                       </div>
-                      <div class="creator-followers">粉丝 {{ c.follower_display or c.follower_count }}</div>
+                      <div class="creator-followers">粉丝 {{ follower_tier(c.follower_count) }}</div>
                     </div>
                     <span class="creator-rank rank-{{ c.rank if c.rank <= 3 else 'n' }}">{{ c.rank }}</span>
                   </div>

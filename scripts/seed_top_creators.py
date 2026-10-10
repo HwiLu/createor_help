@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.db.base import Base  # noqa: E402
 from app.db.session import SessionLocal, engine  # noqa: E402
-from app.models import TopCreator  # noqa: E402
+from app.models import TopCreator, follower_tier  # noqa: E402
 from app.models.enums import CreatorCategory, Platform  # noqa: E402
 
 B = CreatorCategory.BEAUTY
@@ -398,14 +398,6 @@ CREATORS = [
 ]
 
 
-def fmt_followers(n: int) -> str:
-    if n >= 100_000_000:
-        return f"{n / 100_000_000:.1f}亿"
-    if n >= 10_000:
-        return f"{n / 10_000:.0f}万"
-    return str(n)
-
-
 def profile_url(platform: Platform, username: str) -> str:
     kw = urllib.parse.quote(username)
     return {
@@ -438,7 +430,7 @@ def main() -> None:
                 avatar_url=None,
                 profile_url=profile_url(platform, username),
                 follower_count=follower_count,
-                follower_display=fmt_followers(follower_count),
+                follower_display=follower_tier(follower_count),
                 rank=rank,
                 is_featured=True,
                 status="ACTIVE",

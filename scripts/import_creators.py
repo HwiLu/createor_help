@@ -39,7 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.db.base import Base  # noqa: E402
 from app.db.session import SessionLocal, engine  # noqa: E402
-from app.models import TopCreator  # noqa: E402
+from app.models import TopCreator, follower_tier  # noqa: E402
 from app.models.enums import (  # noqa: E402
     CREATOR_CATEGORY_LABELS,
     PLATFORM_LABELS,
@@ -125,14 +125,6 @@ def parse_follower_count(value) -> int | None:
         return int(float(s))
     except ValueError:
         return None
-
-
-def fmt_followers(n: int) -> str:
-    if n >= 100_000_000:
-        return f"{n / 100_000_000:.1f}亿"
-    if n >= 10_000:
-        return f"{n / 10_000:.0f}万"
-    return str(n)
 
 
 def profile_url(platform_value: str, username: str) -> str:
@@ -266,7 +258,7 @@ def upsert(parsed: list[dict], clear_all: bool, clear_platforms: list[str]) -> i
                 .filter(TopCreator.platform == p["platform"], TopCreator.username == p["username"])
                 .first()
             )
-            follower_display = p["follower_display"] or fmt_followers(p["follower_count"])
+            follower_display = p["follower_display"] or follower_tier(p["follower_count"])
             if existing:
                 existing.category = p["category"]
                 if p["nickname"]:
