@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% block title %}{{ activity.title }} - CreatorHub{% endblock %}
+{% block content %}
+<div class="mb-3">
+  <a href="/activities" class="text-decoration-none" style="font-size:14px">&larr; 返回活动列表</a>
+</div>
+
+{% if activity.cover_image_key %}
+<img class="activity-detail-cover" src="/api/v1/activity-images/{{ activity.cover_image_key }}" alt="{{ activity.title }}" onerror="this.style.display='none'">
+{% endif %}
+
+<div class="activity-detail-head">
+  <div class="activity-meta mb-2">
+    <span class="badge badge-soft-primary">{{ activity.platform.name }}</span>
+    <span class="badge badge-soft-neutral">{{ activity.activity_type.name }}</span>
+    {% if display_status == ActivityDisplayStatus.ONGOING %}
+    <span class="badge badge-soft-success">进行中</span>
+    {% elif display_status == ActivityDisplayStatus.UPCOMING %}
+    <span class="badge badge-soft-info">即将开始</span>
+    {% elif display_status == ActivityDisplayStatus.ENDED %}
+    <span class="badge badge-soft-neutral">已结束</span>
+    {% endif %}
+  </div>
+  <h1 class="activity-detail-title mb-3">{{ activity.title }}</h1>
+  <div class="text-secondary" style="font-size:14px">
+    <span class="me-4">开始：{{ activity.start_at|fmt_dt or "未设置" }}</span>
+    <span class="me-4">截止：{{ activity.end_at|fmt_dt or "长期" }}</span>
+    <span class="view-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>{{ activity.view_count }} 次浏览</span>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="card p-4 mb-4">
+      <div class="markdown-body">{{ content_html|safe }}</div>
+      {% if activity.source_url %}
+      <div class="mt-3">
+        <span class="text-secondary" style="font-size:13px">活动来源：</span>
+        <a href="{{ activity.source_url }}" target="_blank" rel="nofollow noopener">{{ activity.source_url }}</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card p-4 mb-4">
+      <h5 class="mb-3">参与入口</h5>
+      {% if entries %}
+        {% for e in entries %}
+        {% set state = entry_states.get(e.id, (False, '')) %}
+        {% set available = state[0] %}
+        {% set reason = state[1] %}
+        <div class="entry-card {% if not available %}entry-unavailable{% endif %}">
+          <div class="d-flex gap-3 align-items-start">
+            {% if e.entry_type == 'QR_IMAGE' and e.qr_image_key %}
+            <div class="text-center">
+              <img class="entry-qr" src="/api/v1/activity-images/{{ e.qr_image_key }}" alt="参与二维码"
+                   onerror="this.style.display='none';var el=document.getElementById('qr-err-{{ e.id }}');if(el)el.style.display='inline';">
+              <div id="qr-err-{{ e.id }}" style="display:none;font-size:12px" class="text-danger mt-1">二维码加载失败</div>
+            </div>
+            {% endif %}
+            <div class="flex-grow-1">
+              <div class="fw-semibold mb-1">{{ e.title }}</div>
+              {% if e.description %}<div class="text-secondary mb-2" style="font-size:13px">{{ e.description }}</div>{% endif %}
+              {% if available %}
+                {% if e.entry_type == 'QR_IMAGE' %}
+                <span class="text-success" style="font-size:13px">请扫码参与</span>
+                {% else %}
+                <a class="btn btn-primary btn-sm" href="{{ e.target_url }}" target="_blank" rel="nofollow noopener">去参与</a>
+                {% endif %}
+              {% else %}
+                <span class="entry-unavailable-hint">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  {{ reason }}
+                </span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <p class="text-secondary mb-0" style="font-size:13px">该活动暂未配置参与入口。</p>
+      {% endif %}
+    </div>
+
+    <div class="risk-notice">
+      <div class="fw-semibold mb-1">风险提示与免责声明</div>
+      {% if risk_html %}{{ risk_html|safe }}{% else %}
+      本活动信息由管理员整理发布，仅供信息参考。CreatorHub 不参与活动主办，不对活动的真实性、有效性及第三方平台行为负责。参与前请自行核实，谨防诈骗，注意保护个人信息与财产安全。
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mt-1">
+  <div class="col-12">
+    <div class="card p-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">评论 <span class="text-secondary" style="font-size:14px">({{ comment_count }})</span></h5>
+        {% if current_user %}<a href="javascript:void(0)" class="text-secondary" style="font-size:13px" onclick="reportActivity()">举报该活动</a>{% endif %}
+      </div>
+
+      {% if current_user %}
+      <div class="comment-form mb-4">
+        <textarea id="comment-input" class="form-control" rows="3" placeholder="友善评论，理性发言…" maxlength="500"></textarea>
+        <div class="d-flex justify-content-end mt-2">
+          <button class="btn btn-primary btn-sm" onclick="submitComment(null)">发表评论</button>
+        </div>
+        <div id="comment-msg" class="small mt-2"></div>
+      </div>
+      {% else %}
+      <div class="text-secondary mb-4" style="font-size:14px"><a href="/login?next=/activities/{{ activity.id }}">登录</a> 后参与评论</div>
+      {% endif %}
+
+      <div id="comment-list">
+        {% for c in comments %}
+        <div class="py-3 border-top" style="border-color:var(--border)!important">
+          <div class="d-flex align-items-start gap-2">
+            <div class="comment-avatar">{{ (c.author.nickname or '?')[0] }}</div>
+            <div class="flex-grow-1 min-width-0">
+              <div class="d-flex align-items-center gap-2">
+                <span class="fw-semibold">{{ c.author.nickname }}</span>
+                <span class="text-secondary" style="font-size:12px">{{ c.created_at|fmt_dt }}</span>
+              </div>
+              <div class="comment-content">{{ c.content }}</div>
+              <div class="d-flex gap-3 mt-1" style="font-size:12px">
+                {% if current_user %}<a href="javascript:void(0)" data-reply-id="{{ c.id }}" data-reply-nick="{{ c.author.nickname }}">回复</a>{% endif %}
+                <a href="javascript:void(0)" class="text-secondary" data-report-id="{{ c.id }}">举报</a>
+              </div>
+              {% if reply_map.get(c.id) %}
+              <div class="comment-replies mt-2">
+                {% for r in reply_map[c.id] %}
+                <div class="d-flex align-items-start gap-2 py-2">
+                  <div class="comment-avatar comment-avatar-sm">{{ (r.author.nickname or '?')[0] }}</div>
+                  <div class="flex-grow-1 min-width-0">
+                    <div style="font-size:13px"><span class="fw-semibold">{{ r.author.nickname }}</span>{% if r.reply_to_nickname %}<span class="text-secondary"> 回复 {{ r.reply_to_nickname }}</span>{% endif %} <span class="text-secondary" style="font-size:12px">{{ r.created_at|fmt_dt }}</span></div>
+                    <div class="comment-content">{{ r.content }}</div>
+                    <div class="d-flex gap-3 mt-1" style="font-size:12px">
+                      {% if current_user %}<a href="javascript:void(0)" data-reply-id="{{ c.id }}" data-reply-nick="{{ r.author.nickname }}">回复</a>{% endif %}
+                      <a href="javascript:void(0)" class="text-secondary" data-report-id="{{ r.id }}">举报</a>
+                    </div>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+        {% if not comments %}
+        <div class="text-center text-secondary py-4" style="font-size:14px">还没有评论，来抢沙发吧～</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="img-lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;cursor:zoom-out;align-items:center;justify-content:center;padding:24px" onclick="this.style.display='none'">
+  <img id="img-lightbox-img" alt="" style="max-width:100%;max-height:100%;border-radius:8px;box-shadow:0 12px 48px rgba(0,0,0,.45)" onclick="event.stopPropagation()">
+</div>
+
+<script>
+(function () {
+  var actId = {{ activity.id }};
+  var input = document.getElementById('comment-input');
+  var replyParent = null;
+
+  function msg(text, isErr) {
+    var el = document.getElementById('comment-msg');
+    if (el) { el.textContent = text; el.style.color = isErr ? '#DC2626' : '#16A34A'; }
+  }
+  window.replyTo = function (commentId, nickname) {
+    replyParent = commentId;
+    if (input) { input.placeholder = '回复 ' + nickname + '：'; input.focus(); }
+  };
+  window.submitComment = function () {
+    if (!input) return;
+    var content = input.value.trim();
+    if (!content) { msg('请输入评论内容', true); return; }
+    var body = { content: content };
+    if (replyParent) body.parent_id = replyParent;
+    fetch('/api/v1/activities/' + actId + '/comments', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok) throw new Error(res.d.detail || '发表失败');
+        msg('评论已发表', false);
+        input.value = ''; replyParent = null; input.placeholder = '友善评论，理性发言…';
+        setTimeout(function () { location.reload(); }, 600);
+      }).catch(function (e) { msg(e.message, true); });
+  };
+  window.reportComment = function (commentId) {
+    var reason = prompt('举报原因：');
+    if (!reason) return;
+    fetch('/api/v1/activities/' + actId + '/comments/' + commentId + '/reports', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: reason })
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok) throw new Error(res.d.detail || '举报失败');
+        alert('举报已提交，我们会尽快处理');
+      }).catch(function (e) { alert(e.message); });
+  };
+  window.reportActivity = function () {
+    var reason = prompt('举报该活动的原因：');
+    if (!reason) return;
+    fetch('/api/v1/activities/' + actId + '/reports', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: reason })
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok) throw new Error(res.d.detail || '举报失败');
+        alert('举报已提交，我们会尽快处理');
+      }).catch(function (e) { alert(e.message); });
+  };
+  document.getElementById('comment-list').addEventListener('click', function (e) {
+    var replyEl = e.target.closest('[data-reply-id]');
+    if (replyEl) { replyTo(replyEl.getAttribute('data-reply-id'), replyEl.getAttribute('data-reply-nick')); return; }
+    var reportEl = e.target.closest('[data-report-id]');
+    if (reportEl) { reportComment(reportEl.getAttribute('data-report-id')); }
+  });
+})();
+
+// 正文图片点击放大查看
+document.addEventListener('click', function (e) {
+  var img = e.target.closest ? e.target.closest('.markdown-body img') : null;
+  if (!img) return;
+  var lb = document.getElementById('img-lightbox');
+  var lbImg = document.getElementById('img-lightbox-img');
+  if (lb && lbImg) {
+    lbImg.src = img.src;
+    lb.style.display = 'flex';
+  }
+});
+</script>
+{% endblock %}

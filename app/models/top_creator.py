@@ -14,14 +14,14 @@ from app.models.enums import CreatorCategory, Platform
 def follower_tier(follower_count: int) -> str:
     """把粉丝数转换为量级区间，用于展示（避免精确数字失真）。
 
-    区间：亿级 / 千万级 / 百万级 / 十万级 / 万级 / 万以下。
+    区间：亿级 / 1000w+ / 100w+ / 十万级 / 万级 / 万以下。
     """
     if follower_count >= 100_000_000:
         return "亿级"
     if follower_count >= 10_000_000:
-        return "千万级"
+        return "1000w+"
     if follower_count >= 1_000_000:
-        return "百万级"
+        return "100w+"
     if follower_count >= 100_000:
         return "十万级"
     if follower_count >= 10_000:

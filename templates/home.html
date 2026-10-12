@@ -14,6 +14,55 @@
   </div>
 </section>
 
+{% if featured_activities %}
+<section class="featured-section">
+  <div class="featured-header">
+    <h2 class="section-title">薅羊毛 · 精选活动</h2>
+    <a class="featured-more" href="/activities">查看更多 &rarr;</a>
+  </div>
+  <div class="row g-3">
+    {% for a in featured_activities %}
+    <div class="col-12 col-sm-6 col-lg-4">
+      <div class="card card-hover activity-card h-100">
+        <a href="/activities/{{ a.id }}" class="text-decoration-none">
+          <div class="activity-cover">
+            {% if a.cover_image_key %}
+            <img src="/api/v1/activity-images/{{ a.cover_image_key }}" alt="{{ a.title }}" loading="lazy" onerror="this.style.display='none'">
+            {% else %}
+            <span class="cover-fallback">{{ a.platform.name[:1] }}</span>
+            {% endif %}
+          </div>
+          <div class="activity-body">
+            <div class="activity-meta">
+              <span class="badge badge-soft-primary">{{ a.platform.name }}</span>
+              <span class="badge badge-soft-neutral">{{ a.activity_type.name }}</span>
+              {% set ds = activity_display_status(a) %}
+              {% if ds == ActivityDisplayStatus.ONGOING %}
+              <span class="badge badge-soft-success">进行中</span>
+              {% elif ds == ActivityDisplayStatus.UPCOMING %}
+              <span class="badge badge-soft-info">即将开始</span>
+              {% elif ds == ActivityDisplayStatus.ENDED %}
+              <span class="badge badge-soft-neutral">已结束</span>
+              {% endif %}
+            </div>
+            <div class="activity-title">{{ a.title }}</div>
+            <div class="activity-summary">{{ a.summary }}</div>
+            <div class="activity-footer">
+              <span class="deadline">截止 {{ a.end_at|fmt_dt or "长期" }}</span>
+              <span class="activity-stats">
+                <span class="view-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>{{ a.view_count }}</span>
+                <span>{{ featured_counts.get(a.id, 0) }} 评论</span>
+              </span>
+            </div>
+          </div>
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
 <form method="get" action="/" class="mb-4">
   <div class="d-flex flex-column flex-md-row gap-3 align-items-stretch">
     <div class="search-wrap flex-grow-1">
@@ -55,7 +104,10 @@
             <span class="mini-avatar">{{ post.author.nickname[:1] }}</span>
             {{ post.author.nickname }}
           </span>
-          <span>已申请 {{ applicant_counts.get(post.id, 0) }}/{{ post.max_applicants }}</span>
+          <span class="post-stats">
+            <span class="view-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>{{ post.view_count }}</span>
+            <span>{{ post.created_at|fmt_dt }}</span>
+          </span>
         </div>
       </div>
     </a>

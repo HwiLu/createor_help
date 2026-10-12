@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from app.models import utcnow
 from app.models.creator_account import CreatorAccount
 from app.models.enums import CreatorAccountStatus, MutualType, NotificationType, PostStatus
-from app.models.mutual_request import MutualRequest
 from app.models.post import Post
 from app.models.user import User
 from app.schemas import PostCreate, PostUpdate
@@ -19,9 +18,30 @@ from app.services.notification_service import notify
 
 
 def create_post(db: Session, user: User, data: PostCreate) -> Post:
-    account = db.get(CreatorAccount, data.target_creator_account_id)
-    if account is None or account.user_id != user.id or account.status == CreatorAccountStatus.DELETED.value:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="目标自媒体账号无效或不属于当前用户")
+    # 信用分低于 60 分：禁止发布帖子
+    if user.credit_score < 60:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="你的信用分低于 60 分，暂时无法发布帖子，请先完成互关任务提升信用分",
+        )
+
+    if data.target_creator_account_id is not None:
+        account = db.get(CreatorAccount, data.target_creator_account_id)
+        if account is None or account.user_id != user.id or account.status == CreatorAccountStatus.DELETED.value:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="目标自媒体账号无效或不属于当前用户")
+    else:
+        # 目标账号昵称可选：留空时用默认名；二维码名片通过 qr_image_key 一并保存
+        name = (data.target_account_name or "").strip()
+        url = (data.target_account_url or "").strip() or None
+        account = CreatorAccount(
+            user_id=user.id,
+            platform=data.target_platform.value,
+            account_name=name or "未命名账号",
+            profile_url=url,
+            status=CreatorAccountStatus.ACTIVE.value,
+        )
+        db.add(account)
+        db.flush()
 
     # 不要求回关的帖子不得宣传为互关
     if data.mutual_type == MutualType.FOLLOW_FOR_FOLLOW and not data.requires_follow_back:
@@ -50,11 +70,12 @@ def create_post(db: Session, user: User, data: PostCreate) -> Post:
         content=data.content.strip(),
         mutual_type=data.mutual_type.value,
         target_platform=data.target_platform.value,
-        target_creator_account_id=data.target_creator_account_id,
+        target_creator_account_id=account.id,
         requires_follow_back=data.requires_follow_back,
         max_applicants=data.max_applicants,
         expires_at=data.expires_at,
         category=data.category,
+        qr_image_key=data.qr_image_key,
         status=PostStatus.PUBLISHED.value,
     )
     db.add(post)
@@ -71,7 +92,7 @@ def update_post(db: Session, user: User, post_id: int, data: PostUpdate) -> Post
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="只能编辑自己的帖子")
 
     changed = False
-    for field in ("title", "content", "category", "max_applicants", "expires_at"):
+    for field in ("title", "content", "category", "expires_at"):
         val = getattr(data, field, None)
         if val is not None:
             setattr(post, field, val.strip() if isinstance(val, str) else val)
@@ -172,11 +193,3 @@ def get_post(db: Session, post_id: int) -> Post:
         db.commit()
         db.refresh(post)
     return post
-
-
-def applicant_count(db: Session, post_id: int) -> int:
-    return (
-        db.query(MutualRequest)
-        .filter(MutualRequest.post_id == post_id, MutualRequest.status != "CANCELLED")
-        .count()
-    )

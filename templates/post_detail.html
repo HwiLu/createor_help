@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
+{% set ns = namespace(has_applied=false) %}
+{% for t in mutual_threads %}{% if current_user and t.apply.user_id == current_user.id %}{% set ns.has_applied = true %}{% endif %}{% endfor %}
 <div class="row justify-content-center">
   <div class="col-12 col-lg-9">
     <div class="card mb-3">
@@ -13,10 +15,15 @@
         </div>
         <h2 class="mb-2" style="font-weight:700;letter-spacing:-.02em">{{ post.title }}</h2>
         <div class="d-flex align-items-center gap-2 text-muted small mb-3">
-          <span class="mini-avatar">{{ post.author.nickname[:1] }}</span>
+          <span class="avatar-wrap">
+            <span class="mini-avatar">{{ post.author.nickname[:1] }}</span>
+            <span class="credit-badge credit-badge-sm" title="信用分">{{ post.author.credit_score }}</span>
+          </span>
           <span>{{ post.author.nickname }}</span>
           <span>·</span>
-          <span>{{ post.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+          <span>{{ post.created_at|fmt_dt }}</span>
+          <span>·</span>
+          <span class="view-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>{{ post.view_count }}</span>
         </div>
         <p class="mb-4" style="font-size:15px;white-space:pre-wrap">{{ post.content }}</p>
 
@@ -27,27 +34,28 @@
             <strong>{{ post.target_account.account_name }}</strong>
             {% if post.target_account.profile_url %}<a href="{{ post.target_account.profile_url }}" target="_blank" rel="noopener" class="small">查看主页 ↗</a>{% endif %}
           </div>
+          {% if post.qr_image_key %}
+          <div class="mt-3">
+            <div class="small text-muted mb-2 fw-medium">二维码名片</div>
+            <img src="/api/v1/posts/qr-image/{{ post.qr_image_key }}" alt="二维码名片" class="qr-thumb" style="width:160px;height:160px;object-fit:contain;border-radius:10px;border:1px solid var(--border);background:#fff;cursor:zoom-in">
+          </div>
+          {% endif %}
         </div>
 
         <div class="p-3 rounded-3 mb-4" style="background:var(--primary-soft);border:1px solid #e0e7ff">
-          <div class="small mb-1 fw-medium" style="color:var(--primary)">互助规则</div>
-          <p class="small mb-0" style="color:#4338ca">
-            申请者请先关注发帖人指定账号，再提交关注证明。
-            {% if post.requires_follow_back %}发帖人核验通过后完成回关。{% else %}本帖不要求回关。{% endif %}
-            已申请 <strong>{{ applicants }}</strong>/{{ post.max_applicants }}。
-          </p>
+          <div class="small mb-2 fw-medium" style="color:var(--primary)">如何互关</div>
+          <ol class="small mb-0 ps-3" style="color:#4338ca">
+            <li>关注上方「目标账号」。</li>
+            <li>在下方评论区点击「申请互关」，上传你已关注的截图，可附言你的账号信息。</li>
+            <li>发帖人看到后回关你，并上传回关截图，流程完成。</li>
+          </ol>
         </div>
 
-        <div class="d-flex gap-2 flex-wrap">
-          {% if current_user and current_user.id != post.user_id %}
-            {% if my_application %}
-              <a href="/mutual" class="btn btn-outline-secondary">查看我的申请（{{ REQUEST_STATUS_LABELS.get(my_application.status, my_application.status) }}）</a>
-            {% elif post.status == 'PUBLISHED' %}
-              <a href="/posts/{{ post.id }}/apply" class="btn btn-primary btn-lg">申请互助</a>
-            {% endif %}
-          {% elif not current_user %}
-            <a href="/login?next=/posts/{{ post.id }}" class="btn btn-primary btn-lg">登录后申请互助</a>
-          {% endif %}
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          <button class="btn like-btn {% if post_liked %}liked{% endif %}" onclick="toggleLike('POST', {{ post.id }}, this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            <span class="like-count">{{ post_like_count }}</span>
+          </button>
           {% if current_user and current_user.id == post.user_id %}
             <button class="btn btn-outline-warning" onclick="closePost({{ post.id }})">关闭帖子</button>
           {% endif %}
@@ -56,27 +64,186 @@
       </div>
     </div>
 
+    <div class="card mb-3">
+      <div class="card-body p-4">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h6 class="mb-0" style="font-weight:700">互关业务 <span class="text-muted fw-normal small">({{ mutual_threads|length }})</span></h6>
+        </div>
+
+        {% if current_user and current_user.id != post.user_id and post.status == 'PUBLISHED' and not ns.has_applied %}
+        <div class="mutual-apply-entry mb-3">
+          <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#apply-panel">
+            已关注，申请互关
+          </button>
+          <div class="collapse mt-3" id="apply-panel">
+            <form id="apply-form">
+              <div class="mb-2">
+                <label class="form-label">关注证据截图（必填）</label>
+                <div class="d-flex align-items-center gap-3">
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="apply-img-btn">上传截图</button>
+                  <span class="small text-muted" id="apply-img-hint">请上传你已关注对方账号的截图</span>
+                  <input type="file" id="apply-img-file" accept="image/*" hidden>
+                  <input type="hidden" id="apply-img-key">
+                </div>
+                <img id="apply-img-preview" class="comment-img mt-2" alt="" style="display:none">
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="apply-message">附言（可选）</label>
+                <input type="text" id="apply-message" class="form-control" maxlength="200" placeholder="例如：我的账号是 xxx，请回关">
+              </div>
+              <button class="btn btn-primary" type="submit">提交申请</button>
+            </form>
+          </div>
+        </div>
+        {% endif %}
+
+        {% for t in mutual_threads %}
+        <div class="mutual-thread">
+          <div class="mutual-apply" id="comment-{{ t.apply.id }}">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="avatar-wrap">
+                <span class="mini-avatar">{{ t.apply.author.nickname[:1] }}</span>
+                <span class="credit-badge credit-badge-sm" title="信用分">{{ t.apply.author.credit_score }}</span>
+              </span>
+              <strong class="small">{{ t.apply.author.nickname }}</strong>
+              <span class="badge badge-soft-primary">{{ COMMENT_TYPE_LABELS.get('APPLY', '互关申请') }}</span>
+              <span class="small text-muted">{{ t.apply.created_at|fmt_dt }}</span>
+            </div>
+            {% if t.apply.content %}<p class="mb-2 small">{{ t.apply.content }}</p>{% endif %}
+            {% if t.apply.image_key %}
+            <div class="small text-muted mb-1">关注证据</div>
+            <img src="/api/v1/posts/{{ post.id }}/comments/image/{{ t.apply.image_key }}" alt="关注证据" class="comment-img zoom-img">
+            {% endif %}
+            <div class="mt-2 d-flex align-items-center gap-2">
+              {% if t.replies %}
+                <span class="badge badge-soft-success">已回关，流程完成</span>
+              {% else %}
+                <span class="badge badge-soft-warning">待回关</span>
+              {% endif %}
+              <button class="like-btn like-btn-sm {% if t.apply.id in comment_liked_ids %}liked{% endif %}" onclick="toggleLike('COMMENT', {{ t.apply.id }}, this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                <span class="like-count">{{ comment_like_counts.get(t.apply.id, 0) }}</span>
+              </button>
+            </div>
+
+            {% for r in t.replies %}
+            <div class="mutual-reply" id="comment-{{ r.id }}">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="avatar-wrap">
+                  <span class="mini-avatar">{{ r.author.nickname[:1] }}</span>
+                  <span class="credit-badge credit-badge-sm" title="信用分">{{ r.author.credit_score }}</span>
+                </span>
+                <strong class="small">{{ r.author.nickname }}</strong>
+                <span class="badge badge-soft-success">{{ COMMENT_TYPE_LABELS.get('FOLLOW_BACK', '已回关') }}</span>
+                <span class="small text-muted">{{ r.created_at|fmt_dt }}</span>
+              </div>
+              {% if r.content %}<p class="mb-2 small">{{ r.content }}</p>{% endif %}
+              {% if r.image_key %}
+              <div class="small text-muted mb-1">回关证据</div>
+              <img src="/api/v1/posts/{{ post.id }}/comments/image/{{ r.image_key }}" alt="回关证据" class="comment-img zoom-img">
+              {% endif %}
+              <div class="mt-2">
+                <button class="like-btn like-btn-sm {% if r.id in comment_liked_ids %}liked{% endif %}" onclick="toggleLike('COMMENT', {{ r.id }}, this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                  <span class="like-count">{{ comment_like_counts.get(r.id, 0) }}</span>
+                </button>
+              </div>
+            </div>
+            {% endfor %}
+
+            {% if t.reviews %}
+            <div class="mt-3">
+              <div class="small text-muted mb-2 fw-medium">互评</div>
+              {% for rv in t.reviews %}
+              <div class="review-item">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <span class="mini-avatar">{{ rv.reviewer.nickname[:1] }}</span>
+                  <strong class="small">{{ rv.reviewer.nickname }}</strong>
+                  <span class="review-stars">{% for i in range(1, 6) %}{% if i <= rv.rating %}★{% else %}☆{% endif %}{% endfor %}</span>
+                  <span class="small text-muted">{{ rv.created_at|fmt_dt }}</span>
+                </div>
+                {% if rv.content %}<p class="mb-0 small" style="color:var(--text-secondary)">{{ rv.content }}</p>{% endif %}
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if t.can_review %}
+            <div class="mt-3">
+              <button class="btn btn-outline-primary btn-sm" onclick="openReview({{ t.apply.id }}, {{ t.reviewee_id }})">评价对方</button>
+            </div>
+            {% endif %}
+
+            {% if current_user and current_user.id == post.user_id and post.status == 'PUBLISHED' and not t.replies %}
+            <div class="mt-3">
+              <form class="followback-form" data-parent="{{ t.apply.id }}">
+                <div class="mb-2">
+                  <label class="form-label">回关证据截图（必填）</label>
+                  <div class="d-flex align-items-center gap-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm fb-btn">上传回关截图</button>
+                    <span class="small text-muted fb-hint">请上传你已回关对方的截图</span>
+                    <input type="file" class="fb-file" accept="image/*" hidden>
+                    <input type="hidden" class="fb-key">
+                  </div>
+                  <img class="fb-preview comment-img mt-2" alt="" style="display:none">
+                </div>
+                <div class="mb-3">
+                  <input type="text" class="form-control fb-message" maxlength="200" placeholder="附言（可选）">
+                </div>
+                <button class="btn btn-success btn-sm" type="submit">确认已回关</button>
+              </form>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% else %}
+        <p class="text-muted small mb-0">暂无互关申请。</p>
+        {% endfor %}
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-body p-4">
         <h6 class="mb-3" style="font-weight:700">评论 <span class="text-muted fw-normal small">({{ comments|length }})</span></h6>
         <div id="comments" class="mb-3">
           {% for c in comments %}
-          <div class="d-flex gap-2 py-3 {% if not loop.last %}border-bottom{% endif %}" style="border-color:var(--border)!important">
-            <span class="mini-avatar" style="width:32px;height:32px;font-size:13px">{{ c.author.nickname[:1] }}</span>
+          <div id="comment-{{ c.id }}" class="d-flex gap-2 py-3 {% if not loop.last %}border-bottom{% endif %}" style="border-color:var(--border)!important">
+            <span class="avatar-wrap">
+              <span class="mini-avatar" style="width:32px;height:32px;font-size:13px">{{ c.author.nickname[:1] }}</span>
+              <span class="credit-badge credit-badge-sm" title="信用分">{{ c.author.credit_score }}</span>
+            </span>
             <div class="flex-grow-1">
               <div class="d-flex align-items-center gap-2">
                 <strong class="small">{{ c.author.nickname }}</strong>
-                <span class="small text-muted">{{ c.created_at.strftime('%m-%d %H:%M') }}</span>
+                <span class="small text-muted">{{ c.created_at|fmt_dt }}</span>
               </div>
-              <p class="mb-0 small" style="color:var(--text-secondary)">{{ c.content }}</p>
+              {% if c.content %}<p class="mb-0 small" style="color:var(--text-secondary)">{{ c.content }}</p>{% endif %}
+              {% if c.image_key %}
+              <img src="/api/v1/posts/{{ post.id }}/comments/image/{{ c.image_key }}" alt="评论图片" class="comment-img zoom-img mt-2">
+              {% endif %}
+              <div class="mt-2">
+                <button class="like-btn like-btn-sm {% if c.id in comment_liked_ids %}liked{% endif %}" onclick="toggleLike('COMMENT', {{ c.id }}, this)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                  <span class="like-count">{{ comment_like_counts.get(c.id, 0) }}</span>
+                </button>
+              </div>
             </div>
           </div>
           {% else %}<p class="text-muted small mb-0">暂无评论，来发表第一条评论吧。</p>{% endfor %}
         </div>
         {% if current_user %}
-        <form id="comment-form" class="d-flex gap-2">
-          <input type="text" name="content" class="form-control" placeholder="发表评论…" maxlength="500" required>
-          <button class="btn btn-primary" type="submit">发送</button>
+        <form id="comment-form">
+          <div class="d-flex gap-2 align-items-center mb-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="comment-img-btn">图片</button>
+            <span class="small text-muted" id="comment-img-hint">可附带一张图片</span>
+            <input type="file" id="comment-img-file" accept="image/*" hidden>
+            <input type="hidden" id="comment-img-key">
+          </div>
+          <img id="comment-img-preview" class="comment-img mb-2" alt="" style="display:none">
+          <div class="d-flex gap-2">
+            <input type="text" name="content" class="form-control" placeholder="发表评论…" maxlength="500">
+            <button class="btn btn-primary" type="submit">发送</button>
+          </div>
         </form>
         {% else %}
         <p class="small text-muted mb-0"><a href="/login">登录</a> 后可评论。</p>
@@ -85,10 +252,71 @@
     </div>
   </div>
 </div>
+
+<div id="qr-lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;cursor:zoom-out;align-items:center;justify-content:center;padding:24px" onclick="this.style.display='none'">
+  <img id="qr-lightbox-img" alt="" style="max-width:100%;max-height:100%;border-radius:8px;background:#fff;box-shadow:0 12px 48px rgba(0,0,0,.45)" onclick="event.stopPropagation()">
+</div>
+
+<div class="modal fade" id="reviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">评价对方</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">评分</label>
+          <div id="review-stars" class="d-flex gap-1">
+            <button type="button" class="review-star-btn on" data-star="1">★</button>
+            <button type="button" class="review-star-btn on" data-star="2">★</button>
+            <button type="button" class="review-star-btn on" data-star="3">★</button>
+            <button type="button" class="review-star-btn on" data-star="4">★</button>
+            <button type="button" class="review-star-btn on" data-star="5">★</button>
+          </div>
+          <input type="hidden" id="review-rating" value="5">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="review-content">评价内容（可选）</label>
+          <textarea id="review-content" class="form-control" rows="3" maxlength="500" placeholder="说说这次互助的感受…"></textarea>
+        </div>
+        <div id="review-msg" class="small" style="display:none"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+        <button class="btn btn-primary" id="review-submit" onclick="submitReview()">提交评价</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+// 通知跳转锚点：滚动定位到指定评论并高亮
+(function () {
+  if (location.hash && location.hash.indexOf('#comment-') === 0) {
+    var el = document.getElementById(location.hash.slice(1));
+    if (el) {
+      setTimeout(function () {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('comment-flash');
+        setTimeout(function () { el.classList.remove('comment-flash'); }, 2000);
+      }, 300);
+    }
+  }
+})();
+
+document.addEventListener('click', function (e) {
+  var img = e.target.closest ? e.target.closest('.qr-thumb, .zoom-img') : null;
+  if (!img) return;
+  var lb = document.getElementById('qr-lightbox');
+  var lbImg = document.getElementById('qr-lightbox-img');
+  if (lb && lbImg) {
+    lbImg.src = img.src;
+    lb.style.display = 'flex';
+  }
+});
 async function closePost(id) {
   if (!confirm('确定关闭该帖子？')) return;
   const res = await fetch('/api/v1/posts/' + id + '/close', { method: 'POST' });
@@ -100,12 +328,169 @@ async function reportPost(id) {
     body: JSON.stringify({ target_type: 'POST', target_id: id, reason: '违规内容', description: '' }) });
   if (res.ok) alert('举报已提交'); else alert('举报失败，请先登录');
 }
+
+async function toggleLike(targetType, targetId, btn) {
+  try {
+    const res = await fetch('/api/v1/likes/toggle', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target_type: targetType, target_id: targetId })
+    });
+    const data = await res.json().catch(function () { return {}; });
+    if (!res.ok) { alert(data.detail || '操作失败，请先登录'); return; }
+    const countEl = btn.querySelector('.like-count');
+    if (countEl) countEl.textContent = data.count;
+    btn.classList.toggle('liked', data.liked);
+  } catch (e) { alert('操作失败'); }
+}
+
+// 评价对方
+let reviewApplyId = null;
+let reviewRevieweeId = null;
+function openReview(applyId, revieweeId) {
+  reviewApplyId = applyId;
+  reviewRevieweeId = revieweeId;
+  setReviewStars(5);
+  document.getElementById('review-content').value = '';
+  const msg = document.getElementById('review-msg');
+  if (msg) { msg.style.display = 'none'; }
+  new bootstrap.Modal(document.getElementById('reviewModal')).show();
+}
+function setReviewStars(n) {
+  document.getElementById('review-rating').value = n;
+  document.querySelectorAll('#review-stars .review-star-btn').forEach(function (b) {
+    b.classList.toggle('on', Number(b.getAttribute('data-star')) <= n);
+  });
+}
+async function submitReview() {
+  const rating = Number(document.getElementById('review-rating').value);
+  const content = document.getElementById('review-content').value.trim();
+  const msg = document.getElementById('review-msg');
+  const btn = document.getElementById('review-submit');
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/v1/reviews', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apply_comment_id: reviewApplyId, reviewee_id: reviewRevieweeId, rating: rating, content: content })
+    });
+    const data = await res.json().catch(function () { return {}; });
+    if (!res.ok) throw new Error(data.detail || '评价失败');
+    bootstrap.Modal.getInstance(document.getElementById('reviewModal')).hide();
+    location.reload();
+  } catch (e) {
+    msg.style.display = 'block'; msg.textContent = e.message; msg.style.color = '#DC2626';
+  } finally {
+    btn.disabled = false;
+  }
+}
+document.querySelectorAll('#review-stars .review-star-btn').forEach(function (b) {
+  b.addEventListener('click', function () { setReviewStars(Number(b.getAttribute('data-star'))); });
+});
 {% if current_user %}
-document.getElementById('comment-form').addEventListener('submit', async (e) => {
+const POST_ID = {{ post.id }};
+const COMMENTS_URL = '/api/v1/posts/' + POST_ID + '/comments';
+
+function uploadCommentImage(file, hintEl, onSuccess) {
+  hintEl.textContent = '上传中…';
+  hintEl.style.color = '';
+  const fd = new FormData();
+  fd.append('file', file);
+  fetch(COMMENTS_URL + '/image', { method: 'POST', body: fd })
+    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+    .then(function (res) {
+      if (!res.ok) throw new Error(res.d.detail || '图片上传失败');
+      onSuccess(res.d.key);
+      hintEl.textContent = '已上传，可重新选择替换';
+      hintEl.style.color = '#16A34A';
+    })
+    .catch(function (e) {
+      hintEl.textContent = e.message;
+      hintEl.style.color = '#DC2626';
+    });
+}
+
+function bindImagePicker(btn, fileInput, keyInput, preview, hint) {
+  btn.addEventListener('click', function () { fileInput.click(); });
+  fileInput.addEventListener('change', function () {
+    const f = fileInput.files && fileInput.files[0];
+    if (!f) return;
+    uploadCommentImage(f, hint, function (key) {
+      keyInput.value = key;
+      preview.src = COMMENTS_URL + '/image/' + key;
+      preview.style.display = 'block';
+    });
+  });
+}
+
+async function postComment(body) {
+  const res = await fetch(COMMENTS_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await res.json().catch(function () { return {}; });
+  if (res.ok) { return data; }
+  else { alert(data.detail || '操作失败'); return null; }
+}
+
+// 普通评论（支持图片）
+bindImagePicker(
+  document.getElementById('comment-img-btn'),
+  document.getElementById('comment-img-file'),
+  document.getElementById('comment-img-key'),
+  document.getElementById('comment-img-preview'),
+  document.getElementById('comment-img-hint')
+);
+document.getElementById('comment-form').addEventListener('submit', async function (e) {
   e.preventDefault();
-  const content = new FormData(e.target).get('content');
-  const res = await fetch('/api/v1/posts/{{ post.id }}/comments', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ content }) });
-  if (res.ok) location.reload(); else alert('评论失败');
+  const content = new FormData(e.target).get('content') || '';
+  const imageKey = document.getElementById('comment-img-key').value;
+  if (!content.trim() && !imageKey) { alert('请填写评论内容或上传图片'); return; }
+  const data = await postComment({ content: content, image_key: imageKey || null, comment_type: 'COMMENT' });
+  if (data) location.reload();
+});
+
+// 申请互关
+var applyForm = document.getElementById('apply-form');
+if (applyForm) {
+  bindImagePicker(
+    document.getElementById('apply-img-btn'),
+    document.getElementById('apply-img-file'),
+    document.getElementById('apply-img-key'),
+    document.getElementById('apply-img-preview'),
+    document.getElementById('apply-img-hint')
+  );
+  applyForm.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const imageKey = document.getElementById('apply-img-key').value;
+    const message = document.getElementById('apply-message').value;
+    if (!imageKey) { alert('请上传关注证据截图'); return; }
+    const data = await postComment({ content: message, image_key: imageKey, comment_type: 'APPLY' });
+    if (data) {
+      if (data.credit_gained) { alert('关注证据已提交，信用分 +' + data.credit_gained); }
+      location.reload();
+    }
+  });
+}
+
+// 回关回复（发帖人）
+document.querySelectorAll('.followback-form').forEach(function (form) {
+  const parentId = form.getAttribute('data-parent');
+  bindImagePicker(
+    form.querySelector('.fb-btn'),
+    form.querySelector('.fb-file'),
+    form.querySelector('.fb-key'),
+    form.querySelector('.fb-preview'),
+    form.querySelector('.fb-hint')
+  );
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const imageKey = form.querySelector('.fb-key').value;
+    const message = form.querySelector('.fb-message').value;
+    if (!imageKey) { alert('请上传回关证据截图'); return; }
+    const data = await postComment({ content: message, image_key: imageKey, comment_type: 'FOLLOW_BACK', parent_id: Number(parentId) });
+    if (data) {
+      if (data.credit_gained) {
+        alert('完成互关业务，信用分 +' + data.credit_gained);
+      }
+      location.reload();
+    }
+  });
 });
 {% endif %}
 </script>

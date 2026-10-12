@@ -23,6 +23,10 @@ import app.models  # noqa: F401
 def client():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    # 反馈限流为进程内存计数，跨用例残留会导致 user id 复用碰撞；每个用例前清空
+    from app.services import feedback_service
+
+    feedback_service._rate_tracker.clear()
     with TestClient(fastapi_app) as c:
         yield c
 

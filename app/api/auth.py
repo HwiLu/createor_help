@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
@@ -76,6 +78,38 @@ def mock_login(
     user = auth_service.mock_login(openid, nickname, db)
     token = auth_service.make_session_cookie(user.id)
     resp = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+    resp.set_cookie(
+        key=settings.SESSION_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=settings.SESSION_COOKIE_SECURE,
+        samesite=settings.SESSION_COOKIE_SAMESITE,
+        max_age=30 * 24 * 3600,
+        path="/",
+    )
+    return resp
+
+
+@router.post("/login")
+def login(
+    username: str = Form(""),
+    password: str = Form(""),
+    next_url: str = Form("/admin"),
+    db: Session = Depends(get_db),
+):
+    """管理员账号密码登录（表单提交）。成功后写入会话 Cookie 并跳转。"""
+    if not next_url or not next_url.startswith("/") or next_url.startswith("//"):
+        next_url = "/admin"
+    try:
+        user = auth_service.login_with_password(username, password, db)
+    except RuntimeError:
+        return RedirectResponse(
+            url=f"/login?next={quote(next_url)}&error=1",
+            status_code=status.HTTP_302_FOUND,
+        )
+
+    token = auth_service.make_session_cookie(user.id)
+    resp = RedirectResponse(url=next_url, status_code=status.HTTP_302_FOUND)
     resp.set_cookie(
         key=settings.SESSION_COOKIE_NAME,
         value=token,

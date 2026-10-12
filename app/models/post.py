@@ -26,6 +26,8 @@ class Post(Base):
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     status: Mapped[str] = mapped_column(String(16), default=PostStatus.PUBLISHED.value, index=True)
     category: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    qr_image_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    view_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 

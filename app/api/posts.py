@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user, get_current_user_optional
@@ -10,8 +11,8 @@ from app.db.session import get_db
 from app.models.post import Post
 from app.models.user import User
 from app.schemas import PostCreate, PostUpdate
+from app.services import post_image_service
 from app.services.post_service import (
-    applicant_count,
     close_post,
     create_post,
     delete_post,
@@ -24,7 +25,6 @@ router = APIRouter(prefix="/posts", tags=["posts"])
 
 
 def _json(post: Post, db: Session) -> dict:
-    occupied = applicant_count(db, post.id)
     return {
         "id": post.id,
         "user_id": post.user_id,
@@ -38,10 +38,10 @@ def _json(post: Post, db: Session) -> dict:
         "expires_at": post.expires_at,
         "status": post.status,
         "category": post.category,
+        "qr_image_key": post.qr_image_key,
+        "qr_image_url": f"/api/v1/posts/qr-image/{post.qr_image_key}" if post.qr_image_key else None,
         "created_at": post.created_at,
         "updated_at": post.updated_at,
-        "applicant_count": occupied,
-        "remaining_slots": max(post.max_applicants - occupied, 0),
         "author": {
             "id": post.author.id,
             "nickname": post.author.nickname,
@@ -75,6 +75,26 @@ def list_posts_api(
 def create_post_api(data: PostCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     post = create_post(db, user, data)
     return _json(post, db)
+
+
+@router.post("/qr-image")
+def upload_post_qr_image(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+):
+    data = file.file.read()
+    key = post_image_service.save_post_qr_image(data, file.filename)
+    return {"key": key, "url": f"/api/v1/posts/qr-image/{key}"}
+
+
+@router.get("/qr-image/{key}")
+def get_post_qr_image(key: str):
+    media_type, data = post_image_service.read_post_qr_image(key)
+    return Response(
+        content=data,
+        media_type=media_type,
+        headers={"Cache-Control": "public, max-age=3600", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 @router.get("/{post_id}")

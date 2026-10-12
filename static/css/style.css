@@ -515,3 +515,350 @@ main { min-height: calc(100vh - 220px); }
 .creator-rank.rank-1 { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #fff; border-color: transparent; }
 .creator-rank.rank-2 { background: linear-gradient(135deg, #cbd5e1, #94a3b8); color: #fff; border-color: transparent; }
 .creator-rank.rank-3 { background: linear-gradient(135deg, #f9a8d4, #d97706); color: #fff; border-color: transparent; }
+
+/* ============================================================
+   薅羊毛活动
+   ============================================================ */
+.activity-card { overflow: hidden; height: 100%; }
+.activity-card a { color: inherit; }
+.activity-cover {
+  position: relative;
+  height: 150px;
+  background: linear-gradient(135deg, var(--primary-soft), #f0f4ff);
+  overflow: hidden;
+}
+.activity-cover img {
+  width: 100%; height: 100%; object-fit: cover;
+  transition: transform .25s ease;
+}
+.activity-card:hover .activity-cover img { transform: scale(1.04); }
+.activity-cover .cover-fallback {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 40px; font-weight: 700; font-family: var(--font-display);
+  color: var(--primary);
+}
+.activity-body { padding: 16px 18px 18px; }
+.activity-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.activity-title {
+  font-size: 16px; font-weight: 600; color: var(--text);
+  line-height: 1.45; margin-bottom: 6px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.activity-card:hover .activity-title { color: var(--primary); }
+.activity-summary {
+  color: var(--text-secondary); font-size: 13px; line-height: 1.6;
+  margin-bottom: 12px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.activity-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: 12px; border-top: 1px solid var(--border);
+  font-size: 12.5px; color: var(--text-tertiary);
+}
+.activity-footer .deadline { color: var(--text-secondary); }
+
+/* 首页精选板块 */
+.featured-section { margin-bottom: 34px; }
+.featured-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.featured-header .section-title { margin-bottom: 0; }
+.featured-more { font-size: 14px; font-weight: 500; color: var(--primary); }
+.featured-more:hover { color: var(--primary-hover); }
+
+/* 活动列表筛选栏 */
+.activity-filters {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 22px;
+  box-shadow: var(--shadow-xs);
+}
+
+/* 活动详情页 */
+.activity-detail-cover {
+  width: 100%; height: 240px; object-fit: cover;
+  border-radius: var(--radius); background: linear-gradient(135deg, var(--primary-soft), #f0f4ff);
+}
+.activity-detail-head { margin: 20px 0 16px; }
+.activity-detail-title { font-size: 26px; font-weight: 700; letter-spacing: -.02em; line-height: 1.35; }
+
+.markdown-body { color: var(--text); font-size: 15px; line-height: 1.8; }
+.markdown-body h3, .markdown-body h4, .markdown-body h5 { margin: 18px 0 10px; }
+.markdown-body p { margin-bottom: 12px; }
+.markdown-body ul { padding-left: 22px; margin-bottom: 12px; }
+.markdown-body blockquote {
+  border-left: 3px solid var(--primary);
+  background: var(--primary-soft);
+  padding: 10px 14px; border-radius: 0 8px 8px 0;
+  margin-bottom: 12px; color: var(--text-secondary);
+}
+.markdown-body a { text-decoration: underline; }
+.markdown-body img {
+  display: block;
+  max-width: 100%;
+  max-height: 400px;
+  width: auto; height: auto;
+  margin: 16px auto;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .08);
+  background: var(--surface);
+  cursor: zoom-in;
+}
+
+/* 参与入口卡片 */
+.entry-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.entry-card .entry-qr {
+  width: 140px; height: 140px; border-radius: 10px;
+  object-fit: contain; background: #fff; border: 1px solid var(--border);
+}
+.entry-card.entry-unavailable { opacity: .75; background: var(--surface-2); }
+.entry-unavailable-hint {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; color: var(--text-tertiary);
+}
+
+/* 免责/风险提示 */
+.risk-notice {
+  background: var(--warning-soft);
+  border: 1px solid #fde2c2;
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  color: #9a5b0c;
+  font-size: 13px;
+}
+
+/* 评论区（活动） */
+.comment-item { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; margin-bottom: 10px; background: var(--surface); }
+.comment-reply-item { margin-left: 40px; background: var(--surface-2); }
+.comment-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.comment-author { font-weight: 600; font-size: 13.5px; }
+.comment-time { color: var(--text-tertiary); font-size: 12px; }
+.comment-content { color: var(--text); font-size: 14px; line-height: 1.6; word-break: break-word; }
+.comment-actions { margin-top: 8px; display: flex; gap: 12px; }
+.comment-actions button { border: none; background: none; color: var(--text-tertiary); font-size: 12.5px; padding: 0; }
+.comment-actions button:hover { color: var(--primary); }
+
+/* 反馈页动态字段 */
+.feedback-extra-fields { border-left: 3px solid var(--primary); padding-left: 16px; margin-top: 12px; }
+
+/* 活动详情评论（头像/回复） */
+.comment-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--primary-hover)); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; flex-shrink: 0; }
+.comment-avatar-sm { width: 26px; height: 26px; font-size: 12px; }
+.comment-replies { background: var(--surface-2); border-radius: var(--radius-sm); padding: 4px 12px; }
+.min-width-0 { min-width: 0; }
+
+/* ============================================================
+   帖子评论区：图片评论 + 互关业务流
+   ============================================================ */
+.comment-img {
+  display: block;
+  max-width: 220px;
+  max-height: 220px;
+  width: auto; height: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  cursor: zoom-in;
+  object-fit: contain;
+}
+.mutual-thread {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.mutual-apply { padding: 14px 16px; background: var(--surface); }
+.mutual-apply-entry {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  background: var(--surface-2);
+}
+.mutual-reply {
+  margin-top: 12px;
+  margin-left: 24px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--success-soft);
+  border: 1px solid #d1fae5;
+}
+
+/* ============================================================
+   通知红点
+   ============================================================ */
+.nav-notif-wrap { position: relative; }
+.notif-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  border: 2px solid #fff;
+  box-sizing: content-box;
+}
+
+/* ============================================================
+   头像 + 信用分角标
+   ============================================================ */
+.avatar-wrap { position: relative; display: inline-flex; }
+.credit-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  border: 2px solid #fff;
+  box-shadow: var(--shadow-xs);
+}
+.credit-badge-lg {
+  min-width: 24px;
+  height: 24px;
+  line-height: 24px;
+  font-size: 12px;
+  top: -8px;
+  right: -8px;
+}
+.credit-badge-sm {
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  line-height: 15px;
+  font-size: 9px;
+  top: -5px;
+  right: -5px;
+  border-width: 1.5px;
+}
+
+/* 信用分卡片 */
+.credit-score-card {
+  background: linear-gradient(135deg, #fff7ed, #ffedd5);
+  border: 1px solid #fed7aa;
+  border-radius: var(--radius-sm);
+  padding: 16px 18px;
+}
+.credit-score-label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  letter-spacing: 0.5px;
+}
+.credit-score-value {
+  font-size: 32px;
+  font-weight: 800;
+  font-family: var(--font-display);
+  line-height: 1.1;
+  color: #ea580c;
+}
+.credit-score-tip {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 6px;
+}
+.credit-level {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.credit-level-high { background: #dcfce7; color: #16a34a; }
+.credit-level-good { background: #dbeafe; color: #2563eb; }
+.credit-level-mid { background: #fef9c3; color: #ca8a04; }
+.credit-level-low { background: #fee2e2; color: #dc2626; }
+
+/* 通知跳转定位到评论后的高亮动画 */
+.comment-flash {
+  animation: comment-flash 2s ease;
+  border-radius: var(--radius-sm);
+}
+@keyframes comment-flash {
+  0% { background: #fff7ed; box-shadow: 0 0 0 2px #f97316; }
+  100% { background: transparent; box-shadow: 0 0 0 0 transparent; }
+}
+
+/* ============================================================
+   浏览量（小眼睛）
+   ============================================================ */
+.view-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-tertiary);
+}
+.view-stat svg { width: 15px; height: 15px; }
+.post-stats { display: inline-flex; align-items: center; gap: 12px; }
+.activity-stats { display: inline-flex; align-items: center; gap: 12px; }
+
+/* ============================================================
+   点赞
+   ============================================================ */
+.like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .15s ease;
+  line-height: 1;
+}
+.like-btn svg { width: 15px; height: 15px; transition: transform .15s ease; }
+.like-btn:hover { border-color: var(--danger); color: var(--danger); }
+.like-btn:hover svg { transform: scale(1.15); }
+.like-btn.liked { background: var(--danger-soft); border-color: #fecaca; color: var(--danger); }
+.like-btn.liked svg { fill: var(--danger); }
+.like-btn-sm { padding: 3px 10px; font-size: 12px; }
+.like-btn-sm svg { width: 13px; height: 13px; }
+
+/* ============================================================
+   评价
+   ============================================================ */
+.review-item {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.review-stars { color: #f59e0b; letter-spacing: 2px; }
+.review-star-btn {
+  border: none;
+  background: transparent;
+  font-size: 26px;
+  color: #d9dce3;
+  cursor: pointer;
+  padding: 0 2px;
+  transition: color .12s ease, transform .12s ease;
+  line-height: 1;
+}
+.review-star-btn:hover { transform: scale(1.15); }
+.review-star-btn.on { color: #f59e0b; }
+

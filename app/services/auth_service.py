@@ -1,6 +1,7 @@
 """认证服务：微信 OAuth 登录（含开发 Mock）。"""
 from __future__ import annotations
 
+import hmac
 import logging
 from datetime import datetime, timezone
 from urllib.parse import urlencode
@@ -115,6 +116,34 @@ def mock_login(openid: str, nickname: str, db: Session) -> User:
         db.refresh(user)
     elif nickname and user.nickname == "创作者":
         user.nickname = nickname
+    user.last_login_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    db.commit()
+    return user
+
+
+def login_with_password(username: str, password: str, db: Session) -> User:
+    """管理员账号密码登录。账号密码从环境变量读取，默认 admin/admin。"""
+    if not settings.admin_password_login_available:
+        raise RuntimeError("账号密码登录未启用（生产环境请修改默认管理员密码）")
+    if not (hmac.compare_digest(username, settings.ADMIN_USERNAME) and hmac.compare_digest(password, settings.ADMIN_PASSWORD)):
+        raise RuntimeError("账号或密码错误")
+
+    openid = f"admin:{settings.ADMIN_USERNAME}"
+    user = db.query(User).filter(User.wechat_openid == openid).first()
+    if user is None:
+        user = User(
+            wechat_openid=openid,
+            nickname="管理员",
+            role=UserRole.ADMIN.value,
+            status=UserStatus.ACTIVE.value,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    elif user.role != UserRole.ADMIN.value:
+        user.role = UserRole.ADMIN.value
+        db.commit()
+
     user.last_login_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     return user

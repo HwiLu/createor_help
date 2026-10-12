@@ -4,47 +4,60 @@
   <div class="col-12 col-lg-8">
     <div class="mb-4">
       <h1 class="section-title mb-1">发布互助帖子</h1>
-      <p class="section-sub mb-0">描述你的互助需求，等待创作者来申请。</p>
+      <p class="section-sub mb-0">描述你的互助需求，分享你的二维码名片。</p>
     </div>
 
+    {% if current_user and current_user.credit_score < 60 %}
+    <div class="alert alert-warning" role="alert">
+      你的信用分为 <strong>{{ current_user.credit_score }}</strong> 分（低于 60 分），暂时无法发布帖子。请先完成互关任务提升信用分后再发布。
+    </div>
+    {% endif %}
     <div class="card">
       <div class="card-body p-4">
-        <form action="/api/v1/posts" method="post">
+        <form id="post-form">
           <div class="mb-3">
             <label class="form-label">帖子标题</label>
-            <input name="title" class="form-control" maxlength="100" required placeholder="如：小红书互关，求同频创作者">
+            <input name="title" class="form-control" minlength="1" maxlength="100" required placeholder="如：小红书互关，求同频创作者">
           </div>
           <div class="row g-3 mb-3">
-            <div class="col-md-4">
+            <div class="col-md-6">
               <label class="form-label">目标平台</label>
               <select name="target_platform" class="form-select" required>
                 {% for p in Platform %}<option value="{{ p.value }}">{{ PLATFORM_LABELS[p.value] }}</option>{% endfor %}
               </select>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
               <label class="form-label">互助类型</label>
               <select name="mutual_type" class="form-select" required>
                 {% for t in MutualType %}<option value="{{ t.value }}">{{ MUTUAL_TYPE_LABELS[t.value] }}</option>{% endfor %}
               </select>
             </div>
-            <div class="col-md-4">
-              <label class="form-label">最多申请人数</label>
-              <input type="number" name="max_applicants" class="form-control" value="10" min="1" max="100">
-            </div>
           </div>
           <div class="mb-3">
-            <label class="form-label">你要推广的目标账号（申请者需关注此账号）</label>
-            <input name="target_account_name" class="form-control" required placeholder="输入你的账号昵称">
+            <label class="form-label">你要推广的目标账号</label>
+            <input name="target_account_name" class="form-control" placeholder="输入你的账号昵称（可选）">
             <input name="target_account_url" class="form-control mt-2" placeholder="账号主页链接（可选）">
           </div>
           <div class="mb-3">
+            <label class="form-label">附加二维码名片（可选）</label>
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+              <button type="button" class="btn btn-outline-primary" id="qr-btn">附加图片</button>
+              <input type="file" id="qr-file" accept="image/png,image/jpeg,image/webp" style="display:none">
+              <img id="qr-preview" alt="二维码名片" style="display:none;width:80px;height:80px;object-fit:cover;border-radius:10px;border:1px solid var(--border)">
+              <button type="button" class="btn btn-sm btn-link text-danger p-0" id="qr-remove" style="display:none">移除</button>
+            </div>
+            <input type="hidden" name="qr_image_key" id="qr-image-key">
+            <div id="qr-status" class="small text-secondary mt-1"></div>
+          </div>
+          <div class="mb-3">
             <label class="form-label">帖子内容</label>
-            <textarea name="content" class="form-control" rows="5" maxlength="2000" required placeholder="说明互助规则、回关要求、注意事项等"></textarea>
+            <textarea name="content" class="form-control" rows="5" minlength="1" maxlength="100" required placeholder="说明互助规则、回关要求、注意事项等"></textarea>
           </div>
           <div class="form-check mb-4">
             <input class="form-check-input" type="checkbox" name="requires_follow_back" value="true" checked id="rfb">
-            <label class="form-check-label" for="rfb">要求申请者关注后我回关（回关互助）</label>
+            <label class="form-check-label" for="rfb">关注后我回关（回关互助）</label>
           </div>
+          <div id="form-msg" class="mb-3 small"></div>
           <div class="d-flex gap-2">
             <button class="btn btn-primary btn-lg px-4" type="submit">发布</button>
             <a href="/" class="btn btn-outline-secondary">取消</a>
@@ -54,4 +67,104 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var form = document.getElementById('post-form');
+  var qrBtn = document.getElementById('qr-btn');
+  var qrFile = document.getElementById('qr-file');
+  var qrPreview = document.getElementById('qr-preview');
+  var qrRemove = document.getElementById('qr-remove');
+  var qrKey = document.getElementById('qr-image-key');
+  var qrStatus = document.getElementById('qr-status');
+  var msg = document.getElementById('form-msg');
+
+  // 信用分低于 60 分：禁用发布按钮
+  var creditScore = {{ current_user.credit_score if current_user else 100 }};
+  var submitBtn = form.querySelector('button[type="submit"]');
+  if (creditScore < 60 && submitBtn) { submitBtn.disabled = true; }
+
+  function showMsg(text, isErr) {
+    msg.textContent = text;
+    msg.style.color = isErr ? '#DC2626' : '#16A34A';
+  }
+
+  var FIELD_LABELS = { title: '标题', content: '内容', target_account_name: '账号昵称', target_account_url: '账号链接', qr_image_key: '二维码', mutual_type: '互助类型', target_platform: '目标平台' };
+  function formatError(detail) {
+    if (!detail) return '发布失败';
+    if (typeof detail === 'string') return detail;
+    if (!Array.isArray(detail)) return '发布失败';
+    return detail.map(function (it) {
+      var field = (it.loc && it.loc[it.loc.length - 1]) || '';
+      var label = FIELD_LABELS[field] || field;
+      if (it.type === 'string_too_long') return label + '过长';
+      if (it.type === 'string_too_short') return label + '过短';
+      return it.msg || (label + '格式错误');
+    }).join('；');
+  }
+
+  qrBtn.addEventListener('click', function () { qrFile.click(); });
+
+  qrFile.addEventListener('change', function () {
+    var f = qrFile.files && qrFile.files[0];
+    if (!f) return;
+    var fd = new FormData();
+    fd.append('file', f);
+    qrStatus.textContent = '上传中…';
+    qrStatus.style.color = '';
+    fetch('/api/v1/posts/qr-image', { method: 'POST', body: fd })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok) throw new Error(res.d.detail || '图片上传失败');
+        qrKey.value = res.d.key;
+        qrPreview.src = res.d.url;
+        qrPreview.style.display = 'block';
+        qrRemove.style.display = 'inline-block';
+        qrStatus.textContent = '二维码名片已上传';
+        qrStatus.style.color = '#16A34A';
+      })
+      .catch(function (e) {
+        qrStatus.textContent = e.message;
+        qrStatus.style.color = '#DC2626';
+        qrKey.value = '';
+      });
+  });
+
+  qrRemove.addEventListener('click', function () {
+    qrKey.value = '';
+    qrFile.value = '';
+    qrPreview.style.display = 'none';
+    qrRemove.style.display = 'none';
+    qrStatus.textContent = '';
+  });
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var fd = new FormData(form);
+    var payload = {
+      title: fd.get('title'),
+      content: fd.get('content'),
+      mutual_type: fd.get('mutual_type'),
+      target_platform: fd.get('target_platform'),
+      target_account_name: (fd.get('target_account_name') || '').trim() || null,
+      target_account_url: (fd.get('target_account_url') || '').trim() || null,
+      requires_follow_back: fd.get('requires_follow_back') === 'true',
+      qr_image_key: qrKey.value || null,
+    };
+    showMsg('发布中…', false);
+    fetch('/api/v1/posts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok) throw new Error(formatError(res.d && res.d.detail));
+        window.location.href = '/posts/' + res.d.id;
+      })
+      .catch(function (e) { showMsg(e.message, true); });
+  });
+})();
+</script>
 {% endblock %}

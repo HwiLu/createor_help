@@ -127,6 +127,21 @@ class CommentStatus(StrEnum):
     DELETED = "DELETED"
 
 
+class CommentType(StrEnum):
+    """评论区业务类型：普通评论 / 互关申请 / 回关回复。"""
+
+    COMMENT = "COMMENT"
+    APPLY = "APPLY"
+    FOLLOW_BACK = "FOLLOW_BACK"
+
+
+COMMENT_TYPE_LABELS = {
+    CommentType.COMMENT: "评论",
+    CommentType.APPLY: "互关申请",
+    CommentType.FOLLOW_BACK: "已回关",
+}
+
+
 class ReportTargetType(StrEnum):
     POST = "POST"
     COMMENT = "COMMENT"
@@ -149,6 +164,9 @@ class NotificationType(StrEnum):
     COMPLETED = "COMPLETED"
     DISPUTE_RESULT = "DISPUTE_RESULT"
     ADMIN = "ADMIN"
+    COMMENT = "COMMENT"
+    EVALUATION = "EVALUATION"
+    CREDIT = "CREDIT"
 
 
 class CreatorCategory(StrEnum):
@@ -171,4 +189,118 @@ CREATOR_CATEGORY_LABELS = {
     CreatorCategory.WORK: "工作",
     CreatorCategory.TRAVEL: "旅游",
     CreatorCategory.GAMING: "游戏",
+}
+
+
+# ---------------------------------------------------------------------------
+# 薅羊毛活动模块
+# ---------------------------------------------------------------------------
+
+
+class ActivityStatus(StrEnum):
+    """活动管理状态（后台控制，与展示态分离）。"""
+
+    PENDING = "PENDING"
+    DRAFT = "DRAFT"
+    PUBLISHED = "PUBLISHED"
+    OFFLINE = "OFFLINE"
+    REJECTED = "REJECTED"
+
+
+ACTIVITY_STATUS_LABELS = {
+    ActivityStatus.PENDING: "待审批",
+    ActivityStatus.DRAFT: "草稿",
+    ActivityStatus.PUBLISHED: "已发布",
+    ActivityStatus.OFFLINE: "已下架",
+    ActivityStatus.REJECTED: "已拒绝",
+}
+
+
+class ActivityDisplayStatus(StrEnum):
+    """活动展示态（由 status + 起止时间实时计算，避免人工填写的状态失真）。"""
+
+    ONGOING = "ONGOING"
+    UPCOMING = "UPCOMING"
+    ENDED = "ENDED"
+
+
+ACTIVITY_DISPLAY_STATUS_LABELS = {
+    ActivityDisplayStatus.ONGOING: "进行中",
+    ActivityDisplayStatus.UPCOMING: "即将开始",
+    ActivityDisplayStatus.ENDED: "已结束",
+}
+
+
+class ActivityEntryType(StrEnum):
+    QR_IMAGE = "QR_IMAGE"
+    LINK = "LINK"
+
+
+ACTIVITY_ENTRY_TYPE_LABELS = {
+    ActivityEntryType.QR_IMAGE: "二维码",
+    ActivityEntryType.LINK: "链接",
+}
+
+
+class ActivityCommentStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    HIDDEN = "HIDDEN"
+    DELETED = "DELETED"
+
+
+class ActivityReportStatus(StrEnum):
+    PENDING = "PENDING"
+    RESOLVED = "RESOLVED"
+    DISMISSED = "DISMISSED"
+
+
+# ---------------------------------------------------------------------------
+# 意见反馈模块
+# ---------------------------------------------------------------------------
+
+
+class FeedbackStatus(StrEnum):
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    RESOLVED = "RESOLVED"
+    REJECTED = "REJECTED"
+
+
+FEEDBACK_STATUS_LABELS = {
+    FeedbackStatus.PENDING: "待处理",
+    FeedbackStatus.PROCESSING: "处理中",
+    FeedbackStatus.RESOLVED: "已处理",
+    FeedbackStatus.REJECTED: "不予处理",
+}
+
+
+# 反馈状态机允许的流转（管理员操作）
+FEEDBACK_STATE_TRANSITIONS: dict[FeedbackStatus, set[FeedbackStatus]] = {
+    FeedbackStatus.PENDING: {
+        FeedbackStatus.PROCESSING,
+        FeedbackStatus.RESOLVED,
+        FeedbackStatus.REJECTED,
+    },
+    FeedbackStatus.PROCESSING: {
+        FeedbackStatus.RESOLVED,
+        FeedbackStatus.REJECTED,
+        FeedbackStatus.PENDING,
+    },
+    FeedbackStatus.RESOLVED: set(),
+    FeedbackStatus.REJECTED: set(),
+}
+
+
+class EmailDeliveryStatus(StrEnum):
+    PENDING = "PENDING"
+    SENT = "SENT"
+    FAILED = "FAILED"
+    UNKNOWN = "UNKNOWN"
+
+
+EMAIL_DELIVERY_STATUS_LABELS = {
+    EmailDeliveryStatus.PENDING: "待发送",
+    EmailDeliveryStatus.SENT: "已发送",
+    EmailDeliveryStatus.FAILED: "发送失败",
+    EmailDeliveryStatus.UNKNOWN: "状态待确认",
 }

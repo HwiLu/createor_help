@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% block title %}薅羊毛活动 - CreatorHub{% endblock %}
+{% block content %}
+<div class="hero d-flex flex-wrap justify-content-between align-items-center gap-3">
+  <div>
+    <h1 class="hero-title">薅羊毛活动</h1>
+    <p class="hero-sub mb-0">邀请助力、拼团组队、集卡抽奖等活动信息，均由管理员审核发布。</p>
+  </div>
+  <div>
+    {% if current_user %}
+    <button class="btn btn-primary btn-lg text-nowrap" onclick="openSubmitModal()">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="vertical-align:-3px;margin-right:6px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      提交新活动
+    </button>
+    {% else %}
+    <a class="btn btn-primary btn-lg text-nowrap" href="/login?next=/activities">登录后提交新活动</a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- 平台标签筛选 -->
+<div class="filter-pills mb-2">
+  <a class="filter-pill {% if not platform_id %}active{% endif %}" href="{{ activity_filter_url(platform_id=None) }}">全部平台</a>
+  {% for p in platforms %}
+  <a class="filter-pill {% if platform_id == p.id %}active{% endif %}" href="{{ activity_filter_url(platform_id=p.id) }}">{{ p.name }}</a>
+  {% endfor %}
+</div>
+
+<!-- 状态标签筛选 -->
+<div class="filter-pills mb-3">
+  <a class="filter-pill {% if not display %}active{% endif %}" href="{{ activity_filter_url(display=None) }}">全部状态</a>
+  <a class="filter-pill {% if display == 'ONGOING' %}active{% endif %}" href="{{ activity_filter_url(display='ONGOING') }}">进行中</a>
+  <a class="filter-pill {% if display == 'UPCOMING' %}active{% endif %}" href="{{ activity_filter_url(display='UPCOMING') }}">即将开始</a>
+  <a class="filter-pill {% if display == 'ENDED' %}active{% endif %}" href="{{ activity_filter_url(display='ENDED') }}">已结束</a>
+</div>
+
+<div class="row g-4">
+  <!-- 左侧：类型标签 -->
+  <div class="col-12 col-lg-3">
+    <div class="card"><div class="card-body p-3">
+      <div class="category-nav">
+        <a class="category-nav-item {% if not type_id %}active{% endif %}" href="{{ activity_filter_url(type_id=None) }}">
+          <span>全部类型</span>
+        </a>
+        {% for t in types %}
+        <a class="category-nav-item {% if type_id == t.id %}active{% endif %}" href="{{ activity_filter_url(type_id=t.id) }}">
+          <span>{{ t.name }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div></div>
+  </div>
+
+  <!-- 右侧：活动卡片 -->
+  <div class="col-12 col-lg-9">
+    {% if activities %}
+    <div class="row g-3">
+      {% for a in activities %}
+      <div class="col-12 col-sm-6 col-xl-4">
+        <div class="card card-hover activity-card h-100">
+          <a href="/activities/{{ a.id }}" class="text-decoration-none">
+            <div class="activity-cover">
+              {% if a.cover_image_key %}
+              <img src="/api/v1/activity-images/{{ a.cover_image_key }}" alt="{{ a.title }}" loading="lazy" onerror="this.style.display='none'">
+              {% else %}
+              <span class="cover-fallback">{{ a.platform.name[:1] }}</span>
+              {% endif %}
+            </div>
+            <div class="activity-body">
+              <div class="activity-meta">
+                <span class="badge badge-soft-primary">{{ a.platform.name }}</span>
+                <span class="badge badge-soft-neutral">{{ a.activity_type.name }}</span>
+                {% set ds = activity_display_status(a) %}
+                {% if ds == ActivityDisplayStatus.ONGOING %}
+                <span class="badge badge-soft-success">进行中</span>
+                {% elif ds == ActivityDisplayStatus.UPCOMING %}
+                <span class="badge badge-soft-info">即将开始</span>
+                {% elif ds == ActivityDisplayStatus.ENDED %}
+                <span class="badge badge-soft-neutral">已结束</span>
+                {% endif %}
+              </div>
+              <div class="activity-title">{{ a.title }}</div>
+              <div class="activity-summary">{{ a.summary }}</div>
+              <div class="activity-footer">
+                <span class="deadline">截止 {{ a.end_at|fmt_dt or "长期" }}</span>
+                <span class="activity-stats">
+                  <span class="view-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>{{ a.view_count }}</span>
+                  <span>{{ counts.get(a.id, 0) }} 评论</span>
+                </span>
+              </div>
+            </div>
+          </a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if total_pages > 1 %}
+    <nav class="mt-4 d-flex justify-content-center">
+      <ul class="pagination mb-0">
+        <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+          <a class="page-link" href="{{ activity_filter_url(page=page - 1) }}">上一页</a>
+        </li>
+        {% for p in range(1, total_pages + 1) %}
+        <li class="page-item {% if p == page %}active{% endif %}">
+          <a class="page-link" href="{{ activity_filter_url(page=p) }}">{{ p }}</a>
+        </li>
+        {% endfor %}
+        <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+          <a class="page-link" href="{{ activity_filter_url(page=page + 1) }}">下一页</a>
+        </li>
+      </ul>
+    </nav>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </div>
+      <h5 class="mb-2">暂无符合条件的活动</h5>
+      <p class="mb-0">可以调整筛选条件，或稍后再来看看。</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- 提交新活动 Modal -->
+<div class="modal fade" id="submitActivityModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">提交新活动</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small" style="color:var(--text-secondary)">提交后由管理员审核，审核通过后展示在活动列表中。</p>
+        <form id="submit-activity-form" onsubmit="return false;">
+          <div class="row g-3">
+            <div class="col-12"><label class="form-label">活动名称 *</label><input id="sub-title" class="form-control" maxlength="100" placeholder="如：拼多多天天领现金"></div>
+            <div class="col-md-6"><label class="form-label">平台 *</label>
+              <select id="sub-platform" class="form-select">
+                {% for p in platforms %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6"><label class="form-label">类型 *</label>
+              <select id="sub-type" class="form-select">
+                {% for t in types %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-12"><label class="form-label">活动介绍 *</label><input id="sub-summary" class="form-control" maxlength="300" placeholder="一句话概括活动，如：邀请 3 位好友各得 5 元红包"></div>
+            <div class="col-12"><label class="form-label">详情 / 参与方式</label><textarea id="sub-content" class="form-control" rows="4" maxlength="2000" placeholder="可填写活动规则、群入口、口令、推荐理由等（选填）"></textarea></div>
+            <div class="col-12"><label class="form-label">正文图片</label><input type="file" id="sub-content-images" accept="image/*" multiple class="form-control mb-2" onchange="uploadContentImages(this)"><div id="sub-content-preview" class="d-flex flex-wrap gap-2"></div><div class="form-text">支持多选，选择后自动上传并插入到正文末尾。</div></div>
+            <div class="col-md-6"><label class="form-label">官方链接</label><input id="sub-source" class="form-control" maxlength="512" placeholder="https://…（选填）"></div>
+            <div class="col-md-6"><label class="form-label">截止时间</label><input type="datetime-local" id="sub-end" class="form-control"></div>
+          </div>
+        </form>
+        <div id="sub-msg" class="small mt-3" style="display:none"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+        <button class="btn btn-primary" onclick="submitActivity(this)">提交审核</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openSubmitModal() {
+  new bootstrap.Modal(document.getElementById('submitActivityModal')).show();
+}
+function pad2(n) { return String(n).padStart(2, '0'); }
+function inputToUtc(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return null;
+  d.setHours(d.getHours() - 8);
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + 'T' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':00';
+}
+async function submitActivity(btn) {
+  const msg = document.getElementById('sub-msg');
+  const showMsg = function (text, isErr) { msg.style.display = 'block'; msg.textContent = text; msg.style.color = isErr ? '#DC2626' : '#16A34A'; };
+  const title = document.getElementById('sub-title').value.trim();
+  const summary = document.getElementById('sub-summary').value.trim();
+  const platform_id = document.getElementById('sub-platform').value;
+  const activity_type_id = document.getElementById('sub-type').value;
+  if (title.length < 5) { showMsg('活动名称至少 5 个字', true); return; }
+  if (!summary) { showMsg('请填写活动介绍', true); return; }
+  if (!platform_id || !activity_type_id) { showMsg('请选择平台和类型', true); return; }
+  btn.disabled = true;
+  try {
+    const payload = {
+      title: title,
+      platform_id: Number(platform_id),
+      activity_type_id: Number(activity_type_id),
+      summary: summary,
+      content: document.getElementById('sub-content').value.trim(),
+      source_url: document.getElementById('sub-source').value.trim() || null,
+      end_at: inputToUtc(document.getElementById('sub-end').value)
+    };
+    const res = await fetch('/api/v1/activities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const data = await res.json().catch(function () { return {}; });
+    if (!res.ok) throw new Error(data.detail || '提交失败');
+    showMsg('已提交，等待管理员审核', false);
+    document.getElementById('submit-activity-form').reset();
+    document.getElementById('sub-content-preview').innerHTML = '';
+    setTimeout(function () { bootstrap.Modal.getInstance(document.getElementById('submitActivityModal')).hide(); }, 1200);
+  } catch (e) {
+    showMsg(e.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function uploadContentImages(input) {
+  const files = input.files;
+  const msg = document.getElementById('sub-msg');
+  const preview = document.getElementById('sub-content-preview');
+  const textarea = document.getElementById('sub-content');
+  if (!files || !files.length) return;
+  for (const f of files) {
+    const fd = new FormData();
+    fd.append('file', f);
+    try {
+      const up = await fetch('/api/v1/activities/upload-image', { method: 'POST', body: fd });
+      const ud = await up.json().catch(function () { return {}; });
+      if (!up.ok) throw new Error(ud.detail || '上传失败');
+      const url = ud.url;
+      textarea.value = textarea.value ? textarea.value + '\n![图片](' + url + ')' : '![图片](' + url + ')';
+      const img = document.createElement('img');
+      img.src = url;
+      img.style.cssText = 'height:72px;width:72px;border-radius:8px;object-fit:cover';
+      preview.appendChild(img);
+    } catch (e) {
+      msg.style.display = 'block'; msg.textContent = '图片上传失败：' + e.message; msg.style.color = '#DC2626';
+    }
+  }
+  input.value = '';
+}
+</script>
+{% endblock %}

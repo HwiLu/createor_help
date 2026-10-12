@@ -82,14 +82,6 @@ def _transition(
     db.add(event)
 
 
-def count_occupied_slots(db: Session, post_id: int) -> int:
-    return (
-        db.query(MutualRequest)
-        .filter(MutualRequest.post_id == post_id, MutualRequest.status != MutualRequestStatus.CANCELLED.value)
-        .count()
-    )
-
-
 def create_application(
     db: Session,
     user: User,
@@ -124,10 +116,6 @@ def create_application(
     )
     if existing is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="你已存在有效申请，请勿重复申请")
-
-    occupied = count_occupied_slots(db, post_id)
-    if occupied >= post.max_applicants:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="申请名额已满")
 
     req = MutualRequest(
         post_id=post_id,

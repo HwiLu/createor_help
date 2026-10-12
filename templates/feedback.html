@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}意见反馈 - CreatorHub{% endblock %}
+{% block content %}
+<div class="feedback-page mx-auto" style="max-width:720px">
+  <div class="mb-4">
+    <h1 class="mb-2" style="font-size:26px;font-weight:600">意见反馈</h1>
+    <p class="text-secondary mb-0" style="font-size:14px">你的建议和反馈会帮助我们做得更好。提交后我们会通过邮件通知管理员处理。</p>
+  </div>
+
+  <div class="card p-4">
+    <form id="feedback-form" onsubmit="return false;">
+      <div class="mb-3">
+        <label class="form-label">反馈分类 *</label>
+        <select id="fb-category" class="form-select">
+          {% for c in categories %}
+          <option value="{{ c.id }}" data-code="{{ c.code }}">{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">标题 *</label>
+        <input id="fb-title" class="form-control" maxlength="100" placeholder="一句话概括你的反馈">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">详细内容 *</label>
+        <textarea id="fb-content" class="form-control" rows="5" maxlength="5000" placeholder="请描述你的建议或遇到的问题…"></textarea>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6"><label class="form-label">相关链接</label><input id="fb-related_url" class="form-control" maxlength="512" placeholder="https://…（选填）"></div>
+        <div class="col-md-6"><label class="form-label">联系方式</label><input id="fb-contact_info" class="form-control" maxlength="256" placeholder="邮箱 / 微信（选填）"></div>
+      </div>
+
+      <div id="fb-msg" class="small mb-3" style="display:none"></div>
+
+      <button id="fb-submit" class="btn btn-primary" type="button" onclick="submitFeedback()">提交反馈</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/feedback.js"></script>
+{% endblock %}

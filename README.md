@@ -9,6 +9,8 @@
 ## 目录
 
 - [核心业务闭环](#核心业务闭环)
+- [薅羊毛活动社区](#薅羊毛活动社区)
+- [意见反馈与邮件通知](#意见反馈与邮件通知)
 - [技术架构](#技术架构)
 - [目录结构](#目录结构)
 - [本地开发快速开始](#本地开发快速开始)
@@ -49,6 +51,51 @@
 
 ---
 
+## 薅羊毛活动社区
+
+面向用户的公开活动展示与互动社区，覆盖邀请助力、拼人头、组队、集卡类活动。
+
+### 功能要点
+
+- **首页精选板块**：首页展示 4–6 个可配置精选活动（仅已发布且未软删除），提供「查看更多」入口。
+- **活动列表页**（`/activities`）：按平台、类型、展示状态筛选，关键字搜索，按发布时间/截止时间排序，分页展示。
+- **活动详情页**（`/activities/{id}`）：封面、富文本详情、参与入口（二维码/链接）、来源链接、风险提示/免责声明、评论区。
+- **评论与举报**：登录用户可发表一级评论与一层回复，可对评论/回复举报；公开接口只返回已审核评论，评论数来自真实记录。
+- **可配置字典**：活动平台（`ActivityPlatform`）与活动类型（`ActivityType`）为后台维护字典，不硬编码；启动时幂等初始化预设项。
+
+### 状态双轨制（防状态造假）
+
+- **管理状态** `status`：`DRAFT`（草稿）/ `PUBLISHED`（发布）/ `OFFLINE`（下架）。
+- **展示态** `display_status`：由 `status + start_at + end_at` 实时计算为 `ONGOING` / `UPCOMING` / `ENDED`，不在数据库存储展示态，已结束活动绝不可能显示为进行中。
+- 约束：`end_at` 早于 `start_at` 禁止保存；精选仅对已发布活动生效；下架/删除/未发布活动不进入首页与公开列表。
+
+### 参与入口如实展示
+
+参与入口支持 `QR_IMAGE`（二维码图片）与 `LINK`（跳转链接）两种类型。二维码未配置、已过期、被禁用或图片加载失败时，页面如实显示禁用态/提示，**不伪造可用状态**。
+
+---
+
+## 意见反馈与邮件通知
+
+用户意见反馈与「新活动提交」入口，写入数据库并通过 SMTP 邮件通知管理员。
+
+### 功能要点
+
+- **反馈分类**：`FeedbackCategory` 可配置字典，含「功能建议」「问题反馈」「新活动提交」等预设项。
+- **新活动提交**（方式 A）：选择该分类后动态展开活动名称、平台、活动介绍、官方链接、群入口线索、截止时间、推荐理由等字段，校验后存入 `extra_data`（JSON）。
+- **状态流转**：`PENDING` → `PROCESSING` → `RESOLVED` / `REJECTED`，记录处理人、处理时间与管理员备注；终态不可再流转。
+- **邮件通知解耦**：反馈提交先写库，数据库成功才提示「反馈已保存」；邮件发送失败**不回滚反馈**，如实提示「邮件通知失败」，管理员可在后台重试。
+
+### 邮件可靠性与安全
+
+- 使用 Python 标准库 `smtplib` 发送；SMTP 密码仅从环境变量读取，**不入源码、不入数据库、不返回前端**。
+- 每次发送写入 `email_delivery_logs`，记录状态（`PENDING`/`SENT`/`FAILED`）、尝试次数、最后错误、发送时间。
+- `system_settings` 表保存反馈接收邮箱、邮件开关、主题前缀等**非敏感**配置；邮件开关默认关闭，避免未配置 SMTP 时误报成功。
+- 重试受 `MAX_EMAIL_RETRY` 上限约束，重试前校验邮件开关与接收邮箱配置。
+- 反馈提交接口按用户做轻量频率限制（默认 30 秒），防止刷接口。
+
+---
+
 ## 技术架构
 
 - **后端**：Python 3.8+ / FastAPI / SQLAlchemy 2.x / Pydantic v2
@@ -79,9 +126,9 @@ helpEachother/
 │   ├── db/
 │   │   ├── base.py             # 声明式基类、跨库 BigInt 类型
 │   │   └── session.py          # engine / Session
-│   ├── models/                 # SQLAlchemy 模型（9 张表）
+│   ├── models/                 # SQLAlchemy 模型（用户/互助/活动/评论/反馈/邮件日志/系统设置等）
 │   ├── schemas/                # Pydantic 请求/响应模型
-│   ├── services/               # 业务服务层（状态机、权限、通知、审计等）
+│   ├── services/               # 业务服务层（状态机、活动、Markdown、反馈、邮件、审计等）
 │   ├── api/                    # REST 路由（/api/v1）
 │   └── web/                    # Jinja2 页面路由
 ├── templates/                  # 页面模板
@@ -169,7 +216,9 @@ Mock 登录**仅**在 `APP_ENV != production` 且 `MOCK_LOGIN_ENABLED=true` 时�
 
 ## 数据库与迁移
 
-### 数据库模型（9 张表）
+### 数据库模型
+
+**互助核心（原 10 张表）**
 
 - `users`：微信用户（openid 唯一索引）
 - `creator_accounts`：用户绑定的自媒体账号
@@ -181,6 +230,22 @@ Mock 登录**仅**在 `APP_ENV != production` 且 `MOCK_LOGIN_ENABLED=true` 时�
 - `notifications`：站内通知
 - `reports`：举报
 - `audit_logs`：管理员操作审计
+
+**薅羊毛活动（新增 6 张表）**
+
+- `activities`：活动主表（软删除 `deleted_at`）
+- `activity_platforms`：活动平台字典
+- `activity_types`：活动类型字典
+- `activity_entries`：参与入口（二维码/链接）
+- `activity_comments`：活动评论（一层回复，软删除）
+- `activity_reports`：活动评论举报
+
+**意见反馈与邮件（新增 4 张表）**
+
+- `feedbacks`：反馈主表（`extra_data` JSON）
+- `feedback_categories`：反馈分类字典
+- `email_delivery_logs`：邮件投递日志
+- `system_settings`：key/value 非敏感配置表
 
 > ID 采用跨库兼容类型 `BigInt = BigInteger().with_variant(Integer, "sqlite")`，SQLite 下使用 `INTEGER`（保证自增），MySQL 下使用 `BIGINT`。
 
@@ -257,6 +322,7 @@ python -m pytest tests -q
 
 已覆盖的验收场景包括：
 
+**互助核心**
 - 未登录不可发布/评论/申请
 - 用户可创建多个自媒体账号、不能修改他人账号
 - 不能申请自己的帖子
@@ -268,6 +334,19 @@ python -m pytest tests -q
 - 证据拒绝与重新提交
 - 争议流程
 - 管理员越权与审计
+
+**薅羊毛活动**
+- 非管理员不可访问后台活动管理接口
+- 草稿不进入公开列表、发布后可见、展示态按起止时间实时计算（进行中/即将开始/已结束）
+- `end_at` 早于 `start_at` 禁止保存
+- 评论/一层回复/举报/评论审核（隐藏后公开列表不再返回）
+
+**意见反馈与邮件**
+- 反馈提交与 `extra_data` 校验（新活动提交缺必填字段返回 400）
+- 反馈提交频率限制（30 秒内重复提交返回 429）
+- 后台反馈状态流转（终态不可再流转）
+- 系统设置读写与白名单校验（敏感项不可通过后台写入）
+- 邮件发送成功/失败投递日志、失败不回滚反馈、邮件重试（关闭开关时重试返回 400）
 
 ---
 
@@ -312,6 +391,31 @@ python -m pytest tests -q
 - `GET  /evidence/{evidence_id}/file`（对象级权限校验）
 - `POST /mutual-requests/{id}/resubmit`
 
+**活动（公开）**
+- `GET  /activities`（筛选/搜索/分页）
+- `GET  /activities/{id}`（详情，含展示态计算）
+- `GET  /activities/{id}/comments`、`POST /activities/{id}/comments`
+- `POST /activities/{id}/comments/{comment_id}/reports`
+- `GET  /activity-images/{id}`（活动入口二维码读取）
+
+**意见反馈（公开）**
+- `GET  /feedback/categories`
+- `POST /feedback`（提交反馈，含「新活动提交」动态字段校验）
+
+**活动管理（后台）**
+- `GET/POST /admin/activities`、`GET/PATCH/DELETE /admin/activities/{id}`
+- `POST /admin/activities/{id}/publish`、`/offline`、`/feature`、`/unfeature`
+- `GET/POST /admin/activity-platforms`、`PATCH/DELETE /admin/activity-platforms/{id}`
+- `GET/POST /admin/activity-types`、`PATCH/DELETE /admin/activity-types/{id}`
+- `GET/POST /admin/activities/{id}/entries`、`PATCH/DELETE /admin/activity-entries/{id}`
+- `GET /admin/activity-comments`、`POST /admin/activity-comments/{id}/moderate`
+- `GET /admin/activity-reports`、`POST /admin/activity-reports/{id}/resolve`
+
+**反馈管理与系统设置（后台）**
+- `GET  /admin/feedback`、`POST /admin/feedback/{id}/status`
+- `GET  /admin/email-logs`、`POST /admin/email-logs/{id}/retry`
+- `GET  /admin/settings`、`POST /admin/settings`（仅限非敏感白名单项）
+
 **通知与管理**
 - `GET  /notifications`、`POST /notifications/{id}/read`
 - `GET  /admin/dashboard`、`GET /admin/reports`
@@ -327,15 +431,16 @@ python -m pytest tests -q
 ### 方式一：Docker Compose（推荐）
 
 1. 准备 `.env`（从 `.env.example` 复制），填写真实 `APP_SECRET_KEY`、微信配置，`MOCK_LOGIN_ENABLED=false`。
-2. 修改 `docker-compose.yml` 中的 MySQL 密码为强随机值（或改为通过 `.env` 注入）。
-3. 构建并启动：
+2. 如需意见反馈邮件通知，填写 `SMTP_HOST`/`SMTP_USERNAME`/`SMTP_PASSWORD`/`SMTP_FROM_EMAIL`；反馈接收邮箱与邮件开关可在后台「系统设置」配置，或直接留空邮件功能（默认关闭，不误报成功）。
+3. 修改 `docker-compose.yml` 中的 MySQL 密码为强随机值（或改为通过 `.env` 注入）。
+4. 构建并启动：
 
 ```bash
 docker compose up -d --build
 ```
 
-4. 容器启动时会自动执行 `alembic upgrade head` 再启动应用（见 `Dockerfile`）。
-5. 初始化管理员：
+5. 容器启动时会自动执行 `alembic upgrade head` 再启动应用（见 `Dockerfile`）。
+6. 初始化管理员：
 
 ```bash
 docker compose exec app python scripts/create_admin.py --openid <openid>
@@ -374,8 +479,12 @@ Nginx(HTTPS 反向代理) → FastAPI(Uvicorn) → MySQL
 - 证据权限：仅申请者、发帖人、管理员可访问（对象级校验）。
 - 上传：白名单格式（JPEG/PNG/WebP）、文件签名校验、随机存储名、大小/分辨率限制。
 - 密钥：全部通过环境变量/`.env` 注入，无硬编码生产密钥。
+- SMTP：密码仅从环境变量读取，不入源码/数据库/前端；后台系统设置仅开放非敏感白名单项。
 - 审计：管理员关键操作写入 `audit_logs`，普通用户不可修改。
 - 越权：所有资源接口校验属主关系，避免 IDOR。
+- 活动：展示态由服务层实时计算，防状态造假；后台活动写操作全部写审计。
+- Markdown：受限安全子集渲染，先 HTML 转义再渲染，链接强制 `rel=nofollow`，阻断脚本注入。
+- 反馈：提交按用户做频率限制；邮件发送失败不回滚反馈，如实区分「已保存」与「邮件通知失败」。
 - 常见 Web 风险：SQLAlchemy 参数化查询防 SQL 注入；Jinja2 默认转义防 XSS；错误响应不暴露堆栈。
 
 > 补充建议（生产上线前）：接入限流（登录/上传/评论/申请/举报）、CSRF 校验（当前 Cookie 使用 `SameSite=Lax` 作为等效缓解）、HTTPS 强制、内容审核与敏感词过滤、用户协议/隐私政策与 ICP 备案按实际部署地区完善。
@@ -395,6 +504,11 @@ Nginx(HTTPS 反向代理) → FastAPI(Uvicorn) → MySQL
 | Mock 登录无效 | 检查 `APP_ENV` 是否为 `production`、`MOCK_LOGIN_ENABLED` 是否为 `true` |
 | 证据上传 403 | 上传者必须是该申请的申请者本人 |
 | 状态转换 409「非法状态转换」 | 业务顺序不正确，参考状态机表；不能跳过中间状态 |
+| 反馈提交后提示「邮件通知失败」 | 属正常如实提示：反馈已保存，但 SMTP 未配置或发送失败；到后台「邮件日志」查看 `last_error` 并手动重试 |
+| 邮件重试返回 400「开关已关闭」 | 先在后台「系统设置」开启「邮件通知」并配置接收邮箱，再重试 |
+| 邮件始终 `FAILED` 且提示 SMTP 未配置 | 检查 `.env` 的 `SMTP_HOST`/`SMTP_USERNAME` 是否已填（密码只从环境变量读取） |
+| 反馈提交 429「过于频繁」 | 触发反馈频率限制（默认 30 秒），属预期防护，稍后重试 |
+| 后台「系统设置」无法写入 `SMTP_PASSWORD` | 属预期：敏感项仅通过环境变量注入，后台仅开放非敏感白名单项 |
 
 ---
 
@@ -416,3 +530,4 @@ Nginx(HTTPS 反向代理) → FastAPI(Uvicorn) → MySQL
 | 阶段 3 | 互助广场、帖子发布/编辑/关闭、评论与申请 | ✅ |
 | 阶段 4 | 证据上传/私有存储、核验、回关、确认、争议、状态日志与通知 | ✅ |
 | 阶段 5 | 后台管理、审计日志、生产部署、自动化测试 | ✅ |
+| 阶段 6 | 薅羊毛活动社区、活动评论举报、意见反馈、邮件通知与系统设置 | ✅ |

@@ -30,6 +30,14 @@ async def lifespan(app: FastAPI):
 
         Base.metadata.create_all(bind=engine)
     Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+
+    # 幂等初始化活动平台/类型/反馈分类字典（迁移与 create_all 两种建表路径均兜底）
+    from app.db.session import SessionLocal
+    from app.services import activity_service
+
+    with SessionLocal() as db:
+        activity_service.ensure_activity_dictionaries(db)
+
     logger.info("CreatorHub 启动，环境=%s", settings.APP_ENV)
     yield
 

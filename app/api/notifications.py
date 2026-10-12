@@ -8,11 +8,12 @@ from app.db.session import get_db
 from app.models import utcnow
 from app.models.notification import Notification
 from app.models.user import User
+from app.services.notification_service import build_link
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 
-def _json(n: Notification) -> dict:
+def _json(db: Session, n: Notification) -> dict:
     return {
         "id": n.id,
         "type": n.type,
@@ -20,6 +21,7 @@ def _json(n: Notification) -> dict:
         "content": n.content,
         "related_entity_type": n.related_entity_type,
         "related_entity_id": n.related_entity_id,
+        "link": build_link(db, n),
         "is_read": n.is_read,
         "created_at": n.created_at,
     }
@@ -36,7 +38,7 @@ def list_notifications(
     total = query.count()
     items = query.order_by(Notification.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
     unread = db.query(Notification).filter(Notification.user_id == user.id, Notification.is_read.is_(False)).count()
-    return {"items": [_json(n) for n in items], "total": total, "unread": unread, "page": page, "page_size": page_size}
+    return {"items": [_json(db, n) for n in items], "total": total, "unread": unread, "page": page, "page_size": page_size}
 
 
 @router.post("/{notification_id}/read")

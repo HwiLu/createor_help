@@ -6,10 +6,45 @@
 </div>
 
 <div class="row g-3 mb-4">
-  <div class="col-6 col-md-3"><div class="stat-box"><div class="stat-num">{{ dashboard.users }}</div><div class="stat-label">用户</div></div></div>
-  <div class="col-6 col-md-3"><div class="stat-box"><div class="stat-num">{{ dashboard.posts }}</div><div class="stat-label">帖子</div></div></div>
-  <div class="col-6 col-md-3"><div class="stat-box"><div class="stat-num">{{ dashboard.active_requests }}</div><div class="stat-label">互助申请</div></div></div>
-  <div class="col-6 col-md-3"><div class="stat-box"><div class="stat-num">{{ dashboard.pending_reports }}</div><div class="stat-label">待处理举报</div></div></div>
+  <div class="col-6 col-md-4"><div class="stat-box"><div class="stat-num">{{ dashboard.users }}</div><div class="stat-label">用户</div></div></div>
+  <div class="col-6 col-md-4"><div class="stat-box"><div class="stat-num">{{ dashboard.posts }}</div><div class="stat-label">帖子</div></div></div>
+  <div class="col-6 col-md-4"><div class="stat-box"><div class="stat-num">{{ dashboard.pending_reports }}</div><div class="stat-label">待处理举报</div></div></div>
+</div>
+
+<!-- ============ 待审批活动 ============ -->
+<div class="card mb-4" style="border-color:var(--primary)!important">
+  <div class="card-body p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h6 class="mb-0" style="font-weight:700">待审批活动 <span class="badge badge-soft-warning">{{ pending_activities|length }}</span></h6>
+      <button class="btn btn-sm btn-outline-primary" onclick="location.reload()">刷新</button>
+    </div>
+    {% if pending_activities %}
+    {% for a in pending_activities %}
+    <div class="py-3 {% if not loop.last %}border-bottom{% endif %}" style="border-color:var(--border)!important">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+        <div class="flex-grow-1 min-width-0">
+          <div class="fw-semibold">{{ a.title }}</div>
+          <div class="small" style="color:var(--text-secondary)">
+            {{ a.platform.name if a.platform else '—' }} · {{ a.activity_type.name if a.activity_type else '—' }}
+            · 提交人：{{ a.creator.nickname if a.creator else '—' }}
+          </div>
+          <div class="small mt-1" style="color:var(--text-secondary)">{{ a.summary }}</div>
+          {% if a.content %}<div class="small mt-1" style="color:var(--text-secondary)">详情：{{ a.content }}</div>{% endif %}
+          {% if a.source_url %}<div class="small mt-1" style="color:var(--text-secondary)">链接：{{ a.source_url }}</div>{% endif %}
+          {% if a.end_at %}<div class="small mt-1" style="color:var(--text-secondary)">截止：{{ a.end_at|fmt_dt }}</div>{% endif %}
+        </div>
+        <div class="d-flex gap-1 flex-shrink-0">
+          <button class="btn btn-sm btn-outline-secondary" onclick="openActivityModal({{ a.id }})">编辑</button>
+          <button class="btn btn-sm btn-outline-success" onclick="approveActivity({{ a.id }})">通过</button>
+          <button class="btn btn-sm btn-outline-danger" onclick="rejectActivity({{ a.id }})">拒绝</button>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="text-muted small mb-0">暂无待审批活动</p>
+    {% endif %}
+  </div>
 </div>
 
 <div class="row g-4">
@@ -83,6 +118,237 @@
     </div></div>
   </div>
 </div>
+
+<!-- ============ 薅羊毛活动管理 ============ -->
+<div class="row g-4 mt-4">
+  <div class="col-12 col-lg-6">
+    <div class="card"><div class="card-body p-4">
+      <h6 class="mb-3" style="font-weight:700">活动平台字典</h6>
+      <div class="d-flex gap-2 mb-3">
+        <input type="text" id="plat-name" class="form-control form-control-sm" placeholder="平台名称">
+        <input type="text" id="plat-code" class="form-control form-control-sm" placeholder="编码(大写)" style="max-width:130px">
+        <button class="btn btn-sm btn-primary text-nowrap" onclick="createPlatform()">添加</button>
+      </div>
+      <div id="platform-list" class="small text-muted">加载中…</div>
+    </div></div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="card"><div class="card-body p-4">
+      <h6 class="mb-3" style="font-weight:700">活动类型字典</h6>
+      <div class="d-flex gap-2 mb-3">
+        <input type="text" id="type-name" class="form-control form-control-sm" placeholder="类型名称">
+        <input type="text" id="type-code" class="form-control form-control-sm" placeholder="编码(大写)" style="max-width:130px">
+        <button class="btn btn-sm btn-primary text-nowrap" onclick="createType()">添加</button>
+      </div>
+      <div id="type-list" class="small text-muted">加载中…</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="row g-4 mt-4">
+  <div class="col-12">
+    <div class="card"><div class="card-body p-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="mb-0" style="font-weight:700">活动管理</h6>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-primary" onclick="loadActivities()">刷新</button>
+          <button class="btn btn-sm btn-primary" onclick="openActivityModal()">新建活动</button>
+        </div>
+      </div>
+      <div class="table-responsive"><table class="table table-sm align-middle">
+        <thead><tr>
+          <th style="color:var(--text-secondary);font-weight:500">ID</th>
+          <th style="color:var(--text-secondary);font-weight:500">标题 / 摘要</th>
+          <th style="color:var(--text-secondary);font-weight:500">平台</th>
+          <th style="color:var(--text-secondary);font-weight:500">类型</th>
+          <th style="color:var(--text-secondary);font-weight:500">状态</th>
+          <th style="color:var(--text-secondary);font-weight:500">精选</th>
+          <th style="color:var(--text-secondary);font-weight:500">操作</th>
+        </tr></thead>
+        <tbody id="activities-tbody">
+          <tr><td colspan="7" class="text-center text-muted small">加载中…</td></tr>
+        </tbody>
+      </table></div>
+    </div></div>
+  </div>
+</div>
+
+<!-- 活动编辑 Modal -->
+<div class="modal fade" id="activityModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="activityModalTitle">新建活动</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="act-id">
+        <div class="row g-3">
+          <div class="col-12"><label class="form-label">标题 *</label><input id="act-title" class="form-control" maxlength="100"></div>
+          <div class="col-md-6"><label class="form-label">平台 *</label><select id="act-platform" class="form-select"></select></div>
+          <div class="col-md-6"><label class="form-label">类型 *</label><select id="act-type" class="form-select"></select></div>
+          <div class="col-12"><label class="form-label">摘要 *</label><input id="act-summary" class="form-control" maxlength="300"></div>
+          <div class="col-12"><label class="form-label">详情（Markdown）*</label><textarea id="act-content" class="form-control" rows="6"></textarea></div>
+          <div class="col-md-6"><label class="form-label">开始时间（北京时间）</label><input type="datetime-local" id="act-start" class="form-control"></div>
+          <div class="col-md-6"><label class="form-label">截止时间（北京时间）</label><input type="datetime-local" id="act-end" class="form-control"></div>
+          <div class="col-md-6"><label class="form-label">来源链接</label><input id="act-source" class="form-control" maxlength="512"></div>
+          <div class="col-12"><label class="form-label">风险提示（Markdown）</label><textarea id="act-risk" class="form-control" rows="3"></textarea></div>
+          <div class="col-md-3"><label class="form-label">排序</label><input type="number" id="act-display-sort" class="form-control" value="0"></div>
+          <div class="col-md-3"><label class="form-label">精选排序</label><input type="number" id="act-featured-sort" class="form-control" value="0"></div>
+          <div class="col-md-6">
+            <label class="form-label d-block">封面图片</label>
+            <input type="file" id="act-cover-file" accept="image/*" class="form-control mb-2">
+            <input type="hidden" id="act-cover-key">
+            <div id="act-cover-preview" class="small text-muted"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+        <button class="btn btn-primary" onclick="saveActivity()">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 参与入口 Modal -->
+<div class="modal fade" id="entryModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">参与入口管理 <span id="entry-act-title" class="small text-muted"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="entry-act-id">
+        <div class="entry-card p-3 mb-3" style="background:var(--surface-2)">
+          <div class="small fw-semibold mb-2" id="entry-form-title">添加入口</div>
+          <input type="hidden" id="entry-id">
+          <div class="row g-2">
+            <div class="col-md-4"><label class="form-label">入口标题 *</label><input id="entry-title" class="form-control form-control-sm"></div>
+            <div class="col-md-3"><label class="form-label">类型 *</label><select id="entry-type" class="form-select form-select-sm"><option value="QR_IMAGE">二维码</option><option value="LINK">链接</option></select></div>
+            <div class="col-md-5"><label class="form-label">目标链接</label><input id="entry-url" class="form-control form-control-sm" placeholder="LINK 类型必填"></div>
+            <div class="col-md-6"><label class="form-label">二维码图片</label><input type="file" id="entry-qr-file" accept="image/*" class="form-control form-control-sm"><input type="hidden" id="entry-qr-key"></div>
+            <div class="col-md-3"><label class="form-label">过期时间</label><input type="datetime-local" id="entry-expires" class="form-control form-control-sm"></div>
+            <div class="col-md-3"><label class="form-label">排序</label><input type="number" id="entry-sort" class="form-control form-control-sm" value="0"></div>
+            <div class="col-12"><label class="form-label">说明</label><input id="entry-desc" class="form-control form-control-sm"></div>
+            <div class="col-12 d-flex gap-2">
+              <button class="btn btn-sm btn-primary" onclick="saveEntry()">保存入口</button>
+              <button class="btn btn-sm btn-outline-secondary" onclick="resetEntryForm()">清空</button>
+            </div>
+          </div>
+        </div>
+        <div id="entry-list" class="small text-muted">加载中…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 活动评论与举报 ============ -->
+<div class="row g-4 mt-4">
+  <div class="col-12 col-lg-6">
+    <div class="card"><div class="card-body p-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="mb-0" style="font-weight:700">活动评论审核</h6>
+        <div class="d-flex gap-2">
+          <select id="comment-status-filter" class="form-select form-select-sm" onchange="loadAdminComments()">
+            <option value="">全部状态</option>
+            <option value="ACTIVE">正常</option>
+            <option value="HIDDEN">已隐藏</option>
+            <option value="DELETED">已删除</option>
+          </select>
+          <button class="btn btn-sm btn-outline-primary" onclick="loadAdminComments()">刷新</button>
+        </div>
+      </div>
+      <div id="admin-comments-list" class="small text-muted">加载中…</div>
+    </div></div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="card"><div class="card-body p-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="mb-0" style="font-weight:700">活动举报处理</h6>
+        <div class="d-flex gap-2">
+          <select id="report-status-filter" class="form-select form-select-sm" onchange="loadAdminReports()">
+            <option value="PENDING" selected>待处理</option>
+            <option value="">全部</option>
+            <option value="RESOLVED">已通过</option>
+            <option value="DISMISSED">已驳回</option>
+          </select>
+          <button class="btn btn-sm btn-outline-primary" onclick="loadAdminReports()">刷新</button>
+        </div>
+      </div>
+      <div id="admin-reports-list" class="small text-muted">加载中…</div>
+    </div></div>
+  </div>
+</div>
+
+<!-- ============ 意见反馈管理 ============ -->
+<div class="row g-4 mt-4">
+  <div class="col-12">
+    <div class="card"><div class="card-body p-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="mb-0" style="font-weight:700">意见反馈管理</h6>
+        <div class="d-flex gap-2">
+          <select id="fb-status-filter" class="form-select form-select-sm" onchange="loadAdminFeedback()">
+            <option value="">全部状态</option>
+            <option value="PENDING">待处理</option>
+            <option value="PROCESSING">处理中</option>
+            <option value="RESOLVED">已处理</option>
+            <option value="REJECTED">不予处理</option>
+          </select>
+          <button class="btn btn-sm btn-outline-primary" onclick="loadAdminFeedback()">刷新</button>
+        </div>
+      </div>
+      <div class="table-responsive"><table class="table table-sm align-middle">
+        <thead><tr>
+          <th style="color:var(--text-secondary);font-weight:500">ID</th>
+          <th style="color:var(--text-secondary);font-weight:500">分类 / 标题</th>
+          <th style="color:var(--text-secondary);font-weight:500">用户</th>
+          <th style="color:var(--text-secondary);font-weight:500">状态</th>
+          <th style="color:var(--text-secondary);font-weight:500">时间</th>
+          <th style="color:var(--text-secondary);font-weight:500">操作</th>
+        </tr></thead>
+        <tbody id="admin-feedback-tbody">
+          <tr><td colspan="6" class="text-center text-muted small">加载中…</td></tr>
+        </tbody>
+      </table></div>
+    </div></div>
+  </div>
+</div>
+
+<!-- ============ 邮件日志与系统设置 ============ -->
+<div class="row g-4 mt-4">
+  <div class="col-12 col-lg-7">
+    <div class="card"><div class="card-body p-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="mb-0" style="font-weight:700">邮件投递日志</h6>
+        <button class="btn btn-sm btn-outline-primary" onclick="loadEmailLogs()">刷新</button>
+      </div>
+      <div id="email-logs-list" class="small text-muted">加载中…</div>
+    </div></div>
+  </div>
+  <div class="col-12 col-lg-5">
+    <div class="card"><div class="card-body p-4">
+      <h6 class="mb-3" style="font-weight:700">系统设置</h6>
+      <div class="mb-3">
+        <label class="form-label small">反馈接收邮箱</label>
+        <input id="setting-recipient" class="form-control form-control-sm" placeholder="admin@example.com">
+      </div>
+      <div class="mb-3">
+        <label class="form-label small">邮件通知开关</label>
+        <select id="setting-enabled" class="form-select form-select-sm">
+          <option value="true">开启</option>
+          <option value="false">关闭</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label small">邮件主题前缀</label>
+        <input id="setting-prefix" class="form-control form-control-sm" placeholder="[CreatorHub]">
+      </div>
+      <button class="btn btn-sm btn-primary" onclick="saveSettings()">保存设置</button>
+    </div></div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -146,6 +412,438 @@ async function deletePost(id) {
   if (res.ok) loadPosts(); else alert((await res.json()).detail || '删除失败');
 }
 
+/* ===== 薅羊毛活动管理 ===== */
+const ACT_STATUS_CN = { PENDING:'待审批', DRAFT:'草稿', PUBLISHED:'已发布', OFFLINE:'已下架', REJECTED:'已拒绝' };
+const ACT_DISPLAY_CN = { ONGOING:'进行中', UPCOMING:'即将开始', ENDED:'已结束' };
+
+async function api(path, opts) {
+  const res = await fetch('/api/v1' + path, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || data.error || ('请求失败 ' + res.status));
+  return data;
+}
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+function utcToInput(s) {
+  if (!s) return '';
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return '';
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]));
+  d.setUTCHours(d.getUTCHours() + 8);
+  return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate()) + 'T' + pad2(d.getUTCHours()) + ':' + pad2(d.getUTCMinutes());
+}
+function inputToUtc(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return null;
+  d.setHours(d.getHours() - 8);
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + 'T' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':00';
+}
+
+/* ---- 平台 / 类型字典 ---- */
+async function loadDictionaries() {
+  try {
+    const p = await api('/admin/platforms');
+    const t = await api('/admin/types');
+    const pl = document.getElementById('platform-list');
+    const tl = document.getElementById('type-list');
+    pl.innerHTML = (p.items || []).map(x => '<div class="d-flex justify-content-between align-items-center py-1 border-bottom" style="border-color:var(--border)!important"><span>' + escapeHtml(x.name) + ' <span class="text-muted">(' + escapeHtml(x.code) + ')</span></span><button class="btn btn-sm btn-outline-danger" onclick="deletePlatform(' + x.id + ')">删除</button></div>').join('') || '暂无平台';
+    tl.innerHTML = (t.items || []).map(x => '<div class="d-flex justify-content-between align-items-center py-1 border-bottom" style="border-color:var(--border)!important"><span>' + escapeHtml(x.name) + ' <span class="text-muted">(' + escapeHtml(x.code) + ')</span></span><button class="btn btn-sm btn-outline-danger" onclick="deleteType(' + x.id + ')">删除</button></div>').join('') || '暂无类型';
+  } catch (e) { alert(e.message); }
+}
+async function createPlatform() {
+  const name = document.getElementById('plat-name').value.trim();
+  const code = document.getElementById('plat-code').value.trim().toUpperCase();
+  if (!name || !code) { alert('请填写平台名称与编码'); return; }
+  try { await api('/admin/platforms', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, code }) }); document.getElementById('plat-name').value=''; document.getElementById('plat-code').value=''; loadDictionaries(); } catch (e) { alert(e.message); }
+}
+async function createType() {
+  const name = document.getElementById('type-name').value.trim();
+  const code = document.getElementById('type-code').value.trim().toUpperCase();
+  if (!name || !code) { alert('请填写类型名称与编码'); return; }
+  try { await api('/admin/types', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, code }) }); document.getElementById('type-name').value=''; document.getElementById('type-code').value=''; loadDictionaries(); } catch (e) { alert(e.message); }
+}
+async function deletePlatform(id) {
+  if (!confirm('确认删除该平台？')) return;
+  try { await api('/admin/platforms/' + id, { method:'DELETE' }); loadDictionaries(); } catch (e) { alert(e.message); }
+}
+async function deleteType(id) {
+  if (!confirm('确认删除该类型？')) return;
+  try { await api('/admin/types/' + id, { method:'DELETE' }); loadDictionaries(); } catch (e) { alert(e.message); }
+}
+
+/* ---- 活动列表 ---- */
+async function loadActivities() {
+  const tbody = document.getElementById('activities-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted small">加载中…</td></tr>';
+  try {
+    const data = await api('/admin/activities?page=1&page_size=100');
+    window._activities = data.items || [];
+    if (!data.items || data.items.length === 0) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted small">暂无活动</td></tr>'; return; }
+    tbody.innerHTML = data.items.map(renderActivityRow).join('');
+  } catch (e) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted small">' + escapeHtml(e.message) + '</td></tr>'; }
+}
+function renderActivityRow(a) {
+  const statusCls = { PENDING:'badge-soft-warning', DRAFT:'badge-soft-neutral', PUBLISHED:'badge-soft-success', OFFLINE:'badge-soft-warning', REJECTED:'badge-soft-danger' }[a.status] || 'badge-soft-neutral';
+  const dispCls = { ONGOING:'badge-soft-success', UPCOMING:'badge-soft-info', ENDED:'badge-soft-neutral' }[a.display_status];
+  const statusBadge = '<span class="badge ' + statusCls + '">' + escapeHtml(ACT_STATUS_CN[a.status] || a.status) + '</span>';
+  const dispBadge = a.display_status ? ' <span class="badge ' + dispCls + '">' + escapeHtml(ACT_DISPLAY_CN[a.display_status] || a.display_status) + '</span>' : '';
+  const featBadge = a.is_featured ? '<span class="badge badge-soft-primary">精选#' + a.featured_sort + '</span>' : '<span class="text-muted">—</span>';
+  let statusBtn = '';
+  if (a.status === 'PUBLISHED') {
+    statusBtn = '<button class="btn btn-sm btn-outline-warning" onclick="setActivityStatus(' + a.id + ',\'offline\')">下架</button>';
+  } else if (a.status === 'PENDING') {
+    statusBtn = '<button class="btn btn-sm btn-outline-success" onclick="approveActivity(' + a.id + ')">通过</button><button class="btn btn-sm btn-outline-danger" onclick="rejectActivity(' + a.id + ')">拒绝</button>';
+  } else {
+    statusBtn = '<button class="btn btn-sm btn-outline-success" onclick="setActivityStatus(' + a.id + ',\'publish\')">发布</button>';
+  }
+  const featBtn = a.is_featured
+    ? '<button class="btn btn-sm btn-outline-secondary" onclick="setFeatured(' + a.id + ',false,' + a.featured_sort + ')">取消精选</button>'
+    : '<button class="btn btn-sm btn-outline-primary" onclick="setFeatured(' + a.id + ',true,' + a.featured_sort + ')">设精选</button>';
+  return '<tr>' +
+    '<td>' + a.id + '</td>' +
+    '<td><div class="fw-semibold text-truncate" style="max-width:200px">' + escapeHtml(a.title) + '</div><div class="small text-truncate" style="color:var(--text-secondary);max-width:200px">' + escapeHtml(a.summary) + '</div>' + (a.creator_nickname ? '<div class="small text-muted">提交人：' + escapeHtml(a.creator_nickname) + '</div>' : '') + '</td>' +
+    '<td>' + escapeHtml(a.platform_name || '') + '</td>' +
+    '<td>' + escapeHtml(a.activity_type_name || '') + '</td>' +
+    '<td>' + statusBadge + dispBadge + '</td>' +
+    '<td>' + featBadge + '</td>' +
+    '<td><div class="d-flex flex-wrap gap-1">' + statusBtn + featBtn +
+      '<button class="btn btn-sm btn-outline-secondary" onclick="openActivityModal(' + a.id + ')">编辑</button>' +
+      '<button class="btn btn-sm btn-outline-primary" onclick="openEntriesModal(' + a.id + ')">入口</button>' +
+      '<button class="btn btn-sm btn-outline-danger" onclick="deleteActivity(' + a.id + ')">删除</button></div></td>' +
+    '</tr>';
+}
+async function setActivityStatus(id, action) {
+  try { await api('/admin/activities/' + id + '/' + action, { method:'POST' }); loadActivities(); } catch (e) { alert(e.message); }
+}
+async function approveActivity(id) {
+  if (!confirm('确认通过并发布该活动？')) return;
+  try { await api('/admin/activities/' + id + '/publish', { method:'POST' }); location.reload(); } catch (e) { alert(e.message); }
+}
+async function rejectActivity(id) {
+  if (!confirm('确认拒绝该活动？拒绝后可在活动管理中重新发布或删除。')) return;
+  try { await api('/admin/activities/' + id + '/reject', { method:'POST' }); location.reload(); } catch (e) { alert(e.message); }
+}
+async function setFeatured(id, featured, sort) {
+  try { await api('/admin/activities/' + id + '/featured', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ is_featured: featured, featured_sort: sort || 0 }) }); loadActivities(); } catch (e) { alert(e.message); }
+}
+async function deleteActivity(id) {
+  if (!confirm('确认删除该活动？（软删除，将不再公开展示）')) return;
+  try { await api('/admin/activities/' + id, { method:'DELETE' }); loadActivities(); } catch (e) { alert(e.message); }
+}
+
+/* ---- 活动编辑 ---- */
+async function openActivityModal(id) {
+  document.getElementById('activityModalTitle').textContent = id ? '编辑活动 #' + id : '新建活动';
+  document.getElementById('act-id').value = id || '';
+  document.getElementById('act-cover-key').value = '';
+  document.getElementById('act-cover-preview').innerHTML = '';
+  document.getElementById('act-cover-file').value = '';
+  let platformId = '', typeId = '';
+  if (!id) {
+    ['act-title','act-summary','act-content','act-source','act-risk'].forEach(k => document.getElementById(k).value = '');
+    document.getElementById('act-start').value = ''; document.getElementById('act-end').value = '';
+    document.getElementById('act-display-sort').value = '0'; document.getElementById('act-featured-sort').value = '0';
+  } else {
+    try {
+      const d = await api('/admin/activities/' + id);
+      const a = d.activity;
+      document.getElementById('act-title').value = a.title || '';
+      document.getElementById('act-summary').value = a.summary || '';
+      document.getElementById('act-content').value = a.content || '';
+      document.getElementById('act-source').value = a.source_url || '';
+      document.getElementById('act-risk').value = a.risk_notice || '';
+      document.getElementById('act-start').value = utcToInput(a.start_at);
+      document.getElementById('act-end').value = utcToInput(a.end_at);
+      document.getElementById('act-display-sort').value = a.display_sort || 0;
+      document.getElementById('act-featured-sort').value = a.featured_sort || 0;
+      platformId = a.platform_id;
+      typeId = a.activity_type_id;
+      document.getElementById('act-cover-key').value = a.cover_image_key || '';
+      document.getElementById('act-cover-preview').innerHTML = a.cover_image_key ? '<img src="/api/v1/activity-images/' + encodeURIComponent(a.cover_image_key) + '" style="height:64px;border-radius:8px" onerror="this.remove()">' : '';
+    } catch (e) { alert(e.message); return; }
+  }
+  await fillDictSelects(platformId, typeId);
+  new bootstrap.Modal(document.getElementById('activityModal')).show();
+}
+async function fillDictSelects(platformId, typeId) {
+  try {
+    const p = await api('/admin/platforms');
+    const t = await api('/admin/types');
+    const ps = document.getElementById('act-platform');
+    const ts = document.getElementById('act-type');
+    ps.innerHTML = (p.items || []).map(x => '<option value="' + x.id + '">' + escapeHtml(x.name) + '</option>').join('');
+    ts.innerHTML = (t.items || []).map(x => '<option value="' + x.id + '">' + escapeHtml(x.name) + '</option>').join('');
+    if (platformId) ps.value = platformId;
+    if (typeId) ts.value = typeId;
+  } catch (e) { alert(e.message); }
+}
+async function saveActivity() {
+  const id = document.getElementById('act-id').value;
+  const title = document.getElementById('act-title').value.trim();
+  const summary = document.getElementById('act-summary').value.trim();
+  const content = document.getElementById('act-content').value.trim();
+  const platform_id = document.getElementById('act-platform').value;
+  const activity_type_id = document.getElementById('act-type').value;
+  if (!title || !summary || !content || !platform_id || !activity_type_id) { alert('请填写标题、平台、类型、摘要与详情'); return; }
+  const file = document.getElementById('act-cover-file').files[0];
+  let cover_image_key = document.getElementById('act-cover-key').value || '';
+  if (file) {
+    const fd = new FormData(); fd.append('file', file);
+    try { const up = await fetch('/api/v1/admin/upload-image', { method:'POST', body: fd }); const ud = await up.json(); if (!up.ok) throw new Error(ud.detail || '上传失败'); cover_image_key = ud.key; } catch (e) { alert(e.message); return; }
+  }
+  const payload = { title, summary, content, platform_id: Number(platform_id), activity_type_id: Number(activity_type_id), cover_image_key, start_at: inputToUtc(document.getElementById('act-start').value), end_at: inputToUtc(document.getElementById('act-end').value), source_url: document.getElementById('act-source').value.trim() || null, risk_notice: document.getElementById('act-risk').value.trim() || null, display_sort: Number(document.getElementById('act-display-sort').value) || 0, featured_sort: Number(document.getElementById('act-featured-sort').value) || 0 };
+  try {
+    if (id) { await api('/admin/activities/' + id, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }); }
+    else { await api('/admin/activities', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }); }
+    bootstrap.Modal.getInstance(document.getElementById('activityModal')).hide();
+    loadActivities();
+  } catch (e) { alert(e.message); }
+}
+
+/* ---- 参与入口管理 ---- */
+async function openEntriesModal(activityId) {
+  const a = (window._activities || []).find(x => x.id === activityId);
+  document.getElementById('entry-act-id').value = activityId;
+  document.getElementById('entry-act-title').textContent = a ? '#' + activityId + ' ' + (a.title || '') : '#' + activityId;
+  resetEntryForm();
+  new bootstrap.Modal(document.getElementById('entryModal')).show();
+  await loadEntries();
+}
+function resetEntryForm() {
+  document.getElementById('entry-id').value = '';
+  document.getElementById('entry-title').value = '';
+  document.getElementById('entry-type').value = 'QR_IMAGE';
+  document.getElementById('entry-url').value = '';
+  document.getElementById('entry-qr-key').value = '';
+  document.getElementById('entry-qr-file').value = '';
+  document.getElementById('entry-expires').value = '';
+  document.getElementById('entry-sort').value = '0';
+  document.getElementById('entry-desc').value = '';
+  document.getElementById('entry-form-title').textContent = '添加入口';
+}
+async function loadEntries() {
+  const aid = document.getElementById('entry-act-id').value;
+  const box = document.getElementById('entry-list');
+  try {
+    const d = await api('/admin/activities/' + aid);
+    const list = d.entries || [];
+    if (list.length === 0) { box.innerHTML = '<div class="text-center text-muted py-3">暂无参与入口</div>'; return; }
+    box.innerHTML = list.map(e => {
+      const type = e.entry_type === 'LINK' ? '链接' : '二维码';
+      const enabled = e.is_enabled ? '<span class="badge badge-soft-success">启用</span>' : '<span class="badge badge-soft-warning">停用</span>';
+      const qr = e.qr_image_key ? '<img src="/api/v1/activity-images/' + encodeURIComponent(e.qr_image_key) + '" style="height:40px;border-radius:6px" onerror="this.remove()">' : '';
+      return '<div class="d-flex align-items-center gap-2 py-2 border-bottom" style="border-color:var(--border)!important">' +
+        qr + '<div class="flex-grow-1 min-width-0"><div class="fw-semibold">' + escapeHtml(e.title) + ' <span class="badge badge-soft-neutral">' + type + '</span> ' + enabled + '</div>' +
+        (e.target_url ? '<div class="small text-truncate" style="color:var(--text-secondary)">' + escapeHtml(e.target_url) + '</div>' : '') + '</div>' +
+        '<div class="d-flex gap-1"><button class="btn btn-sm btn-outline-secondary" onclick="editEntry(' + e.id + ')">编辑</button>' +
+        '<button class="btn btn-sm btn-outline-danger" onclick="deleteEntry(' + e.id + ')">删除</button></div></div>';
+    }).join('');
+  } catch (e) { box.innerHTML = '<div class="text-center text-danger small">' + escapeHtml(e.message) + '</div>'; }
+}
+function editEntry(id) {
+  const aid = document.getElementById('entry-act-id').value;
+  api('/admin/activities/' + aid).then(d => {
+    const e = (d.entries || []).find(x => x.id === id);
+    if (!e) return;
+    document.getElementById('entry-id').value = e.id;
+    document.getElementById('entry-title').value = e.title || '';
+    document.getElementById('entry-type').value = e.entry_type || 'QR_IMAGE';
+    document.getElementById('entry-url').value = e.target_url || '';
+    document.getElementById('entry-qr-key').value = e.qr_image_key || '';
+    document.getElementById('entry-expires').value = utcToInput(e.expires_at);
+    document.getElementById('entry-sort').value = e.sort_order || 0;
+    document.getElementById('entry-desc').value = e.description || '';
+    document.getElementById('entry-form-title').textContent = '编辑入口 #' + id;
+  }).catch(err => alert(err.message));
+}
+async function saveEntry() {
+  const aid = document.getElementById('entry-act-id').value;
+  const id = document.getElementById('entry-id').value;
+  const title = document.getElementById('entry-title').value.trim();
+  const entry_type = document.getElementById('entry-type').value;
+  const target_url = document.getElementById('entry-url').value.trim();
+  if (!title) { alert('请填写入口标题'); return; }
+  if (entry_type === 'LINK' && !target_url) { alert('链接类型必须填写目标链接'); return; }
+  let qr_image_key = document.getElementById('entry-qr-key').value || null;
+  const file = document.getElementById('entry-qr-file').files[0];
+  if (file) {
+    const fd = new FormData(); fd.append('file', file);
+    try { const up = await fetch('/api/v1/admin/upload-image', { method:'POST', body: fd }); const ud = await up.json(); if (!up.ok) throw new Error(ud.detail || '上传失败'); qr_image_key = ud.key; } catch (e) { alert(e.message); return; }
+  }
+  const payload = { title, entry_type, qr_image_key, target_url: target_url || null, description: document.getElementById('entry-desc').value.trim() || null, sort_order: Number(document.getElementById('entry-sort').value) || 0, expires_at: inputToUtc(document.getElementById('entry-expires').value) };
+  try {
+    if (id) { await api('/admin/entries/' + id, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }); }
+    else { await api('/admin/activities/' + aid + '/entries', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }); }
+    resetEntryForm(); await loadEntries();
+  } catch (e) { alert(e.message); }
+}
+async function deleteEntry(id) {
+  if (!confirm('确认删除该入口？')) return;
+  try { await api('/admin/entries/' + id, { method:'DELETE' }); await loadEntries(); } catch (e) { alert(e.message); }
+}
+
+/* ---- 活动评论审核 ---- */
+const COMMENT_STATUS_CN = { ACTIVE:'正常', HIDDEN:'已隐藏', DELETED:'已删除' };
+async function loadAdminComments() {
+  const box = document.getElementById('admin-comments-list');
+  const statusFilter = document.getElementById('comment-status-filter').value;
+  box.innerHTML = '<div class="text-muted">加载中…</div>';
+  try {
+    const d = await api('/admin/activity-comments?page=1&page_size=50' + (statusFilter ? '&status=' + statusFilter : ''));
+    if (!d.items || d.items.length === 0) { box.innerHTML = '<div class="text-muted">暂无评论</div>'; return; }
+    box.innerHTML = d.items.map(c => {
+      const badges = { ACTIVE:'badge-soft-success', HIDDEN:'badge-soft-warning', DELETED:'badge-soft-neutral' };
+      return '<div class="py-2 border-bottom" style="border-color:var(--border)!important">' +
+        '<div class="d-flex justify-content-between align-items-start gap-2">' +
+        '<div class="flex-grow-1 min-width-0"><div class="fw-semibold">' + escapeHtml(c.author_nickname) + ' <span class="badge ' + (badges[c.status] || 'badge-soft-neutral') + '">' + (COMMENT_STATUS_CN[c.status] || c.status) + '</span> <span class="text-muted small">#活动' + c.activity_id + '</span></div>' +
+        '<div class="text-truncate" style="color:var(--text-secondary)">' + escapeHtml(c.content) + '</div></div>' +
+        '<div class="d-flex gap-1 flex-shrink-0">' +
+        (c.status !== 'ACTIVE' ? '<button class="btn btn-sm btn-outline-success" onclick="moderateComment(' + c.id + ',\'ACTIVE\')">通过</button>' : '') +
+        (c.status !== 'HIDDEN' ? '<button class="btn btn-sm btn-outline-warning" onclick="moderateComment(' + c.id + ',\'HIDDEN\')">隐藏</button>' : '') +
+        (c.status !== 'DELETED' ? '<button class="btn btn-sm btn-outline-danger" onclick="moderateComment(' + c.id + ',\'DELETED\')">删除</button>' : '') +
+        '</div></div></div>';
+    }).join('');
+  } catch (e) { box.innerHTML = '<div class="text-danger">' + escapeHtml(e.message) + '</div>'; }
+}
+async function moderateComment(id, status) {
+  try { await api('/admin/activity-comments/' + id + '/moderate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status: status }) }); loadAdminComments(); } catch (e) { alert(e.message); }
+}
+
+/* ---- 活动举报处理 ---- */
+const REPORT_STATUS_CN = { PENDING:'待处理', RESOLVED:'已通过', DISMISSED:'已驳回' };
+async function loadAdminReports() {
+  const box = document.getElementById('admin-reports-list');
+  const statusFilter = document.getElementById('report-status-filter').value;
+  box.innerHTML = '<div class="text-muted">加载中…</div>';
+  try {
+    const d = await api('/admin/activity-reports?page=1&page_size=50' + (statusFilter ? '&status=' + statusFilter : ''));
+    if (!d.items || d.items.length === 0) { box.innerHTML = '<div class="text-muted">暂无举报</div>'; return; }
+    box.innerHTML = d.items.map(r => {
+      const target = r.target || {};
+      const targetText = target.type === 'COMMENT' ? '评论「' + escapeHtml(target.content || '') + '」' : '活动「' + escapeHtml(target.title || '') + '」';
+      const badges = { PENDING:'badge-soft-warning', RESOLVED:'badge-soft-success', DISMISSED:'badge-soft-neutral' };
+      return '<div class="py-2 border-bottom" style="border-color:var(--border)!important">' +
+        '<div class="fw-semibold">' + escapeHtml(r.reason) + ' <span class="badge ' + (badges[r.status] || 'badge-soft-neutral') + '">' + (REPORT_STATUS_CN[r.status] || r.status) + '</span></div>' +
+        '<div class="small" style="color:var(--text-secondary)">目标：' + targetText + ' · 举报人：' + escapeHtml(r.reporter_nickname) + '</div>' +
+        (r.description ? '<div class="small text-truncate" style="color:var(--text-secondary)">' + escapeHtml(r.description) + '</div>' : '') +
+        (r.resolution ? '<div class="small" style="color:var(--text-secondary)">处理说明：' + escapeHtml(r.resolution) + '</div>' : '') +
+        (r.status === 'PENDING' ? '<div class="d-flex gap-1 mt-1"><button class="btn btn-sm btn-outline-success" onclick="resolveReport(' + r.id + ',\'RESOLVED\')">通过</button><button class="btn btn-sm btn-outline-danger" onclick="resolveReport(' + r.id + ',\'DISMISSED\')">驳回</button></div>' : '') +
+        '</div>';
+    }).join('');
+  } catch (e) { box.innerHTML = '<div class="text-danger">' + escapeHtml(e.message) + '</div>'; }
+}
+async function resolveReport(id, status) {
+  const resolution = prompt('处理说明（必填）：');
+  if (!resolution) return;
+  try { await api('/admin/activity-reports/' + id + '/resolve', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status: status, resolution: resolution }) }); loadAdminReports(); } catch (e) { alert(e.message); }
+}
+
+/* ---- 意见反馈管理 ---- */
+const FEEDBACK_STATUS_CN = { PENDING:'待处理', PROCESSING:'处理中', RESOLVED:'已处理', REJECTED:'不予处理' };
+const FEEDBACK_ACTION_CN = { PROCESSING:'开始处理', RESOLVED:'标记已处理', REJECTED:'不予处理', PENDING:'退回待处理' };
+const FEEDBACK_TRANSITIONS = { PENDING:['PROCESSING','RESOLVED','REJECTED'], PROCESSING:['RESOLVED','REJECTED','PENDING'] };
+const EXTRA_LABELS = { activity_name:'活动名称', platform:'活动平台', activity_desc:'活动介绍', official_url:'官方链接', group_entry:'群入口线索', deadline:'截止时间', recommend_reason:'推荐理由' };
+const FB_BADGES = { PENDING:'badge-soft-warning', PROCESSING:'badge-soft-info', RESOLVED:'badge-soft-success', REJECTED:'badge-soft-neutral' };
+
+async function loadAdminFeedback() {
+  const tbody = document.getElementById('admin-feedback-tbody');
+  const statusFilter = document.getElementById('fb-status-filter').value;
+  tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted small">加载中…</td></tr>';
+  try {
+    const d = await api('/admin/feedback?page=1&page_size=100' + (statusFilter ? '&status=' + statusFilter : ''));
+    if (!d.items || d.items.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted small">暂无反馈</td></tr>'; return; }
+    let rows = '';
+    d.items.forEach(f => {
+      const extraHtml = (f.extra_data && Object.keys(f.extra_data).length)
+        ? '<div class="small mt-1" style="color:var(--text-secondary)">' + Object.keys(f.extra_data).map(k => (EXTRA_LABELS[k] || k) + '：' + escapeHtml(f.extra_data[k] || '')).join('<br>') + '</div>'
+        : '';
+      const actions = (FEEDBACK_TRANSITIONS[f.status] || []).map(s =>
+        '<button class="btn btn-sm btn-outline-primary" onclick="updateFeedbackStatus(' + f.id + ',\'' + s + '\')">' + (FEEDBACK_ACTION_CN[s] || s) + '</button>'
+      ).join(' ');
+      rows += '<tr>' +
+        '<td>' + f.id + '</td>' +
+        '<td><div class="fw-semibold text-truncate" style="max-width:220px">' + escapeHtml(f.category_name || '') + ' · ' + escapeHtml(f.title) + '</div></td>' +
+        '<td>' + escapeHtml(f.user_nickname || '') + '</td>' +
+        '<td><span class="badge ' + (FB_BADGES[f.status] || 'badge-soft-neutral') + '">' + (FEEDBACK_STATUS_CN[f.status] || f.status) + '</span></td>' +
+        '<td class="small text-muted">' + (f.created_at ? f.created_at.replace('T', ' ').substring(0, 16) : '') + '</td>' +
+        '<td><div class="d-flex gap-1"><button class="btn btn-sm btn-outline-secondary" onclick="toggleFeedbackDetail(' + f.id + ')">详情</button>' + actions + '</div></td>' +
+        '</tr>';
+      rows += '<tr id="fb-detail-' + f.id + '" style="display:none"><td colspan="6" style="background:var(--surface-2)">' +
+        '<div class="p-2 small">' +
+        '<div><span class="text-muted">内容：</span>' + escapeHtml(f.content) + '</div>' +
+        (f.related_url ? '<div><span class="text-muted">链接：</span>' + escapeHtml(f.related_url) + '</div>' : '') +
+        (f.contact_info ? '<div><span class="text-muted">联系方式：</span>' + escapeHtml(f.contact_info) + '</div>' : '') +
+        extraHtml +
+        (f.admin_note ? '<div class="mt-1"><span class="text-muted">管理员备注：</span>' + escapeHtml(f.admin_note) + '</div>' : '') +
+        '</div></td></tr>';
+    });
+    tbody.innerHTML = rows;
+  } catch (e) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger small">' + escapeHtml(e.message) + '</td></tr>'; }
+}
+function toggleFeedbackDetail(id) {
+  const tr = document.getElementById('fb-detail-' + id);
+  if (tr) tr.style.display = tr.style.display === 'none' ? '' : 'none';
+}
+async function updateFeedbackStatus(id, status) {
+  const note = prompt('处理说明（可留空）：');
+  if (note === null) return;
+  try { await api('/admin/feedback/' + id + '/status', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status: status, admin_note: note || null }) }); loadAdminFeedback(); } catch (e) { alert(e.message); }
+}
+
+/* ---- 邮件投递日志 ---- */
+const EMAIL_STATUS_CN = { PENDING:'待发送', SENT:'已发送', FAILED:'发送失败', UNKNOWN:'待确认' };
+async function loadEmailLogs() {
+  const box = document.getElementById('email-logs-list');
+  box.innerHTML = '<div class="text-muted">加载中…</div>';
+  try {
+    const d = await api('/admin/email-logs?page=1&page_size=50');
+    if (!d.items || d.items.length === 0) { box.innerHTML = '<div class="text-muted">暂无邮件日志</div>'; return; }
+    box.innerHTML = d.items.map(l => {
+      const badge = l.status === 'SENT' ? 'badge-soft-success' : (l.status === 'FAILED' ? 'badge-soft-warning' : 'badge-soft-neutral');
+      return '<div class="py-2 border-bottom" style="border-color:var(--border)!important">' +
+        '<div class="d-flex justify-content-between align-items-start gap-2">' +
+        '<div class="flex-grow-1 min-width-0"><div class="fw-semibold text-truncate">' + escapeHtml(l.subject || '') + '</div>' +
+        '<div class="small text-truncate" style="color:var(--text-secondary)">收件：' + escapeHtml(l.recipient_email || '') + ' · 尝试 ' + l.attempt_count + ' 次 <span class="badge ' + badge + '">' + (EMAIL_STATUS_CN[l.status] || l.status) + '</span></div>' +
+        (l.last_error ? '<div class="small text-truncate text-danger">' + escapeHtml(l.last_error) + '</div>' : '') + '</div>' +
+        (l.status !== 'SENT' ? '<button class="btn btn-sm btn-outline-primary flex-shrink-0" onclick="retryEmail(' + l.id + ')">重试</button>' : '') +
+        '</div></div>';
+    }).join('');
+  } catch (e) { box.innerHTML = '<div class="text-danger">' + escapeHtml(e.message) + '</div>'; }
+}
+async function retryEmail(id) {
+  try { await api('/admin/email-logs/' + id + '/retry', { method:'POST' }); loadEmailLogs(); } catch (e) { alert(e.message); }
+}
+
+/* ---- 系统设置 ---- */
+async function loadSettings() {
+  try {
+    const d = await api('/admin/settings');
+    const map = {}; (d.items || []).forEach(s => { map[s.key] = s.value; });
+    document.getElementById('setting-recipient').value = map.feedback_recipient_email || '';
+    document.getElementById('setting-enabled').value = String(map.email_notifications_enabled).toLowerCase() === 'true' ? 'true' : 'false';
+    document.getElementById('setting-prefix').value = map.email_subject_prefix || '';
+  } catch (e) { alert(e.message); }
+}
+async function saveSettings() {
+  const entries = [
+    { key: 'feedback_recipient_email', value: document.getElementById('setting-recipient').value.trim() || null },
+    { key: 'email_notifications_enabled', value: document.getElementById('setting-enabled').value },
+    { key: 'email_subject_prefix', value: document.getElementById('setting-prefix').value.trim() || null }
+  ];
+  try {
+    for (const e of entries) { await api('/admin/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(e) }); }
+    alert('设置已保存');
+  } catch (e) { alert(e.message); }
+}
+
 loadPosts();
+loadDictionaries();
+loadActivities();
+loadAdminComments();
+loadAdminReports();
+loadAdminFeedback();
+loadEmailLogs();
+loadSettings();
 </script>
 {% endblock %}

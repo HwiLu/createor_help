@@ -13,6 +13,14 @@
 
 {% block scripts %}
 <script>
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 async function loadNotifs() {
   const res = await fetch('/api/v1/notifications');
   const data = await res.json();
@@ -23,20 +31,41 @@ async function loadNotifs() {
       </div><h5 class="mb-1">暂无通知</h5><p class="mb-0">有新消息会在这里提醒你。</p></div>`;
     return;
   }
-  list.innerHTML = data.items.map(n => `
-    <div class="notif-item p-3 mb-2 ${n.is_read ? '' : 'unread'}">
+  list.innerHTML = data.items.map(n => {
+    const linkAttr = n.link ? ` data-link="${escapeHtml(n.link)}" data-id="${n.id}"` : '';
+    const cursor = n.link ? ' style="cursor:pointer"' : '';
+    return `
+    <div class="notif-item p-3 mb-2 ${n.is_read ? '' : 'unread'}"${cursor}${linkAttr}>
       <div class="d-flex justify-content-between align-items-start gap-2">
         <div class="flex-grow-1">
           <div class="d-flex align-items-center gap-2">
             ${!n.is_read ? '<span class="badge badge-soft-primary">新</span>' : ''}
-            <strong class="${n.is_read ? 'text-muted' : ''}" style="font-size:14px">${n.title}</strong>
+            <strong class="${n.is_read ? 'text-muted' : ''}" style="font-size:14px">${escapeHtml(n.title)}</strong>
           </div>
-          <p class="small mb-1" style="color:var(--text-secondary)">${n.content}</p>
+          <p class="small mb-1" style="color:var(--text-secondary)">${escapeHtml(n.content)}</p>
           <span class="small" style="color:var(--text-tertiary)">${new Date(n.created_at).toLocaleString()}</span>
+          ${n.link ? '<div class="small mt-1" style="color:var(--primary)">查看详情 ›</div>' : ''}
         </div>
-        ${!n.is_read ? '<button class="btn btn-sm btn-outline-primary" onclick="markRead('+n.id+')">标为已读</button>' : ''}
+        ${!n.is_read ? `<button type="button" class="btn btn-sm btn-outline-primary" data-read="${n.id}">标为已读</button>` : ''}
       </div>
-    </div>`).join('');
+    </div>`;}).join('');
+}
+document.getElementById('notif-list').addEventListener('click', function (e) {
+  var readBtn = e.target.closest('[data-read]');
+  if (readBtn) {
+    e.stopPropagation();
+    markRead(readBtn.getAttribute('data-read'));
+    return;
+  }
+  var item = e.target.closest('[data-link]');
+  if (item) {
+    var id = item.getAttribute('data-id');
+    openNotif(item.getAttribute('data-link'), id);
+  }
+});
+function openNotif(link, id) {
+  fetch('/api/v1/notifications/' + id + '/read', { method: 'POST' });
+  window.location.href = link;
 }
 async function markRead(id) {
   await fetch('/api/v1/notifications/' + id + '/read', { method: 'POST' });
