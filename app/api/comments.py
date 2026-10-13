@@ -7,13 +7,14 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user, get_current_user_optional
+from app.core.rate_limit import comment_limiter
 from app.db.session import get_db
 from app.models.comment import Comment
 from app.models.enums import CommentStatus, CommentType, NotificationType
 from app.models.post import Post
 from app.models.user import User
 from app.schemas import CommentCreate
-from app.services import comment_image_service, credit_service
+from app.services import comment_image_service, credit_service, upload_util
 from app.services.notification_service import notify
 
 router = APIRouter(prefix="/posts/{post_id}/comments", tags=["comments"])
@@ -53,7 +54,7 @@ def upload_comment_image(
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
 ):
-    data = file.file.read()
+    data = upload_util.read_upload_limited(file)
     key = comment_image_service.save_comment_image(data, file.filename)
     return {"key": key}
 
@@ -75,6 +76,11 @@ def create_comment(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    if not comment_limiter.allow(f"comment:{user.id}"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="操作过于频繁，请稍后再试",
+        )
     post = db.get(Post, post_id)
     if post is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="帖子不存在")

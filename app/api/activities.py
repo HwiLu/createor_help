@@ -11,7 +11,7 @@ from app.db.session import get_db
 from app.models.enums import ActivityDisplayStatus
 from app.models.user import User
 from app.schemas import ActivitySubmit
-from app.services import activity_image_service, activity_service, audit_service
+from app.services import activity_image_service, activity_service, audit_service, upload_util
 
 router = APIRouter(prefix="/activities", tags=["activities"])
 
@@ -88,7 +88,7 @@ async def upload_activity_image(
     user: User = Depends(get_current_user),
 ):
     """用户提交活动时上传封面图片，返回存储 key。"""
-    data = await file.read()
+    data = upload_util.read_upload_limited(file)
     key = activity_image_service.save_activity_image(data, file.filename)
     return {"key": key, "url": f"/api/v1/activity-images/{key}"}
 

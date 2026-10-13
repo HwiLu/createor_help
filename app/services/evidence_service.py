@@ -15,6 +15,7 @@ from app.models.enums import EvidenceType
 from app.models.evidence import EvidenceFile
 from app.models.mutual_request import MutualRequest
 from app.models.user import User
+from app.services.upload_util import read_upload_limited
 
 ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP"}
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
@@ -65,7 +66,7 @@ def save_evidence(
     if req.applicant_user_id != user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="只有申请者可以上传证据")
 
-    data = file.file.read()
+    data = read_upload_limited(file)
     _check_extension(file.filename)
     fmt, _ = _validate_image(data)
 

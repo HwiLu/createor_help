@@ -18,7 +18,7 @@ from app.schemas import (
     ActivityTypeCreate,
     ActivityUpdate,
 )
-from app.services import activity_service
+from app.services import activity_service, upload_util
 from app.services.activity_image_service import save_activity_image
 from app.services.audit_service import write_audit
 
@@ -73,7 +73,7 @@ async def upload_activity_image(
     file: UploadFile = File(...),
     admin: User = Depends(get_current_admin),
 ):
-    data = await file.read()
+    data = upload_util.read_upload_limited(file)
     key = save_activity_image(data, file.filename)
     return {"key": key, "url": f"/api/v1/activity-images/{key}"}
 

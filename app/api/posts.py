@@ -2,16 +2,17 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user, get_current_user_optional
+from app.core.rate_limit import post_limiter
 from app.db.session import get_db
 from app.models.post import Post
 from app.models.user import User
 from app.schemas import PostCreate, PostUpdate
-from app.services import post_image_service
+from app.services import post_image_service, upload_util
 from app.services.post_service import (
     close_post,
     create_post,
@@ -73,6 +74,11 @@ def list_posts_api(
 
 @router.post("")
 def create_post_api(data: PostCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not post_limiter.allow(f"post:{user.id}"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="发布过于频繁，请稍后再试",
+        )
     post = create_post(db, user, data)
     return _json(post, db)
 
@@ -82,7 +88,7 @@ def upload_post_qr_image(
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
 ):
-    data = file.file.read()
+    data = upload_util.read_upload_limited(file)
     key = post_image_service.save_post_qr_image(data, file.filename)
     return {"key": key, "url": f"/api/v1/posts/qr-image/{key}"}
 

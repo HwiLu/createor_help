@@ -1,3 +1,24 @@
+// CSRF 防护：后端采用 Double-Submit Cookie，前端对所有 /api/ 写请求自动回填 X-CSRF-Token。
+// 通过 monkey-patch fetch，无需逐个修改既有调用点。
+(function () {
+  function getCookie(name) {
+    var m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+  var csrfToken = getCookie('csrf_token');
+  var originalFetch = window.fetch;
+  var writeMethods = { POST: true, PUT: true, PATCH: true, DELETE: true };
+  window.fetch = function (input, init) {
+    init = init || {};
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    var method = (init.method || 'GET').toUpperCase();
+    if (csrfToken && writeMethods[method] && url.indexOf('/api/') !== -1) {
+      init.headers = Object.assign({}, init.headers, { 'X-CSRF-Token': csrfToken });
+    }
+    return originalFetch.call(this, input, init);
+  };
+})();
+
 async function logout(e) {
   e.preventDefault();
   await fetch('/api/v1/auth/logout', { method: 'POST' });

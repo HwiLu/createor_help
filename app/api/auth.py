@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.deps import get_current_user
+from app.core.rate_limit import login_limiter
 from app.db.session import get_db
 from app.models.user import User
 from app.services import auth_service
@@ -92,17 +94,27 @@ def mock_login(
 
 @router.post("/login")
 def login(
+    request: Request,
     username: str = Form(""),
     password: str = Form(""),
     next_url: str = Form("/admin"),
     db: Session = Depends(get_db),
 ):
     """管理员账号密码登录（表单提交）。成功后写入会话 Cookie 并跳转。"""
+    # 暴力破解防护：按客户端 IP 限流
+    client_ip = request.client.host if request.client else "unknown"
+    if not login_limiter.allow(f"login:{client_ip}"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="登录尝试过于频繁，请稍后再试",
+        )
     if not next_url or not next_url.startswith("/") or next_url.startswith("//"):
         next_url = "/admin"
     try:
         user = auth_service.login_with_password(username, password, db)
     except RuntimeError:
+        # 统一失败延迟，缓解时序/爆破攻击
+        time.sleep(0.5)
         return RedirectResponse(
             url=f"/login?next={quote(next_url)}&error=1",
             status_code=status.HTTP_302_FOUND,

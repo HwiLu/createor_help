@@ -79,6 +79,24 @@ class Settings(BaseSettings):
     def wechat_configured(self) -> bool:
         return bool(self.WECHAT_APP_ID and self.WECHAT_APP_SECRET)
 
+    def validate_security_settings(self) -> None:
+        """生产环境安全配置校验：弱密钥/弱密码/不安全 Cookie 直接拒绝启动。"""
+        if not self.is_production:
+            return
+        problems: list[str] = []
+        if self.APP_SECRET_KEY in ("", "change-me-to-a-long-random-string", "change-me"):
+            problems.append("APP_SECRET_KEY 不能使用默认弱值，请设置为强随机字符串")
+        if len(self.APP_SECRET_KEY) < 32:
+            problems.append("APP_SECRET_KEY 长度不足 32 字符")
+        if self.ADMIN_PASSWORD in ("", "admin", "password", "123456", "admin123"):
+            problems.append("ADMIN_PASSWORD 不能使用默认弱密码")
+        if not self.SESSION_COOKIE_SECURE:
+            problems.append("生产环境必须开启 SESSION_COOKIE_SECURE=true")
+        if self.MOCK_LOGIN_ENABLED:
+            problems.append("生产环境必须关闭 MOCK_LOGIN_ENABLED")
+        if problems:
+            raise RuntimeError("安全配置校验失败: " + "; ".join(problems))
+
 
 @lru_cache
 def get_settings() -> Settings:
